@@ -304,13 +304,60 @@
 
   <!-- GOAL -->
   <div id="tab-goal" style="display:none">
+
+    <!-- 지출 감축 목표 -->
+    <div class="goal-card" style="border-color:var(--red)">
+      <div class="goal-header"><div class="goal-title">🔻 이번 달 지출 감축 목표</div></div>
+      <div class="form-group"><label class="form-label">목표 지출 한도 (원) — 예: 지금 -400만이면 350만으로 설정</label><input class="form-input" id="expGoalInput" type="number" placeholder="예: 3500000"></div>
+      <button class="btn-save" style="width:100%;border-radius:var(--radius-sm);padding:12px;font-size:15px;font-weight:700;cursor:pointer;border:none;color:white;background:var(--red)" onclick="saveExpGoal()">목표 저장</button>
+    </div>
+    <div class="goal-card" id="expGoalProgressCard" style="display:none;border-color:var(--red)">
+      <div class="goal-header"><div class="goal-title">지출 감축 현황</div></div>
+      <div class="goal-amounts">
+        <div class="goal-current" id="expGoalCurrent" style="color:var(--red)">₩0</div>
+        <div class="goal-target" id="expGoalTargetLabel">/ ₩0 한도</div>
+      </div>
+      <div class="goal-bar"><div class="goal-fill" id="expGoalFill" style="width:0%;background:linear-gradient(90deg,var(--green),var(--yellow))"></div></div>
+      <div class="goal-meta"><span id="expGoalStatus"></span><span id="expGoalRemain"></span></div>
+    </div>
+
+    <!-- 카테고리별 한도 -->
+    <div class="goal-card">
+      <div class="goal-header"><div class="goal-title">📋 카테고리별 월 한도</div><span style="font-size:11px;color:var(--text3)">초과 시 🔴 표시</span></div>
+      <div id="catLimitList" style="margin-bottom:12px"></div>
+      <div class="form-row" style="margin-bottom:10px">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">카테고리</label>
+          <select class="form-select" id="limitCat">
+            <option value="생활-식비">생활-식비</option>
+            <option value="생활-교통">생활-교통</option>
+            <option value="생활-주거">생활-주거</option>
+            <option value="생활-통신">생활-통신</option>
+            <option value="생활-구독">생활-구독</option>
+            <option value="생활-의료">생활-의료</option>
+            <option value="생활-기타">생활-기타</option>
+            <option value="사업-인건비">사업-인건비</option>
+            <option value="사업-외주비">사업-외주비</option>
+            <option value="사업-운영비">사업-운영비</option>
+            <option value="사업-기타">사업-기타</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">한도 금액 (원)</label>
+          <input class="form-input" id="limitAmt" type="number" placeholder="예: 200000">
+        </div>
+      </div>
+      <button class="add-btn" style="width:100%;padding:10px;font-size:13px" onclick="addCatLimit()">+ 한도 추가</button>
+    </div>
+
+    <!-- 저축 목표 -->
     <div class="goal-card">
       <div class="goal-header"><div class="goal-title">🎯 이번 달 저축 목표</div></div>
-      <div class="form-group"><label class="form-label">목표 저축액 (원)</label><input class="form-input" id="goalInput" type="number" placeholder="예: 500000"></div>
+      <div class="form-group"><label class="form-label">목표 저축액 (원) — 지금은 10~30만 원 추천</label><input class="form-input" id="goalInput" type="number" placeholder="예: 100000"></div>
       <button class="btn-save" style="width:100%;border-radius:var(--radius-sm);padding:12px;font-size:15px;font-weight:700;cursor:pointer;border:none;color:white" onclick="saveGoal()">목표 저장</button>
     </div>
     <div class="goal-card" id="goalProgressCard" style="display:none">
-      <div class="goal-header"><div class="goal-title">달성 현황</div></div>
+      <div class="goal-header"><div class="goal-title">저축 달성 현황</div></div>
       <div class="goal-amounts"><div class="goal-current" id="goalCurrent">₩0</div><div class="goal-target" id="goalTargetLabel">/ ₩0 목표</div></div>
       <div class="goal-bar"><div class="goal-fill" id="goalFill" style="width:0%"></div></div>
       <div class="goal-meta"><span id="goalPct">0% 달성</span><span id="goalRemain"></span></div>
@@ -451,6 +498,8 @@ let currentModalType=null,editingIndex=null,editingType=null;
 let data=JSON.parse(localStorage.getItem('assetData')||'{}');
 let debts=JSON.parse(localStorage.getItem('assetDebts')||'[]');
 let goals=JSON.parse(localStorage.getItem('assetGoals')||'{}');
+let catLimits=JSON.parse(localStorage.getItem('assetCatLimits')||'{}');
+let expGoals=JSON.parse(localStorage.getItem('assetExpGoals')||'{}');
 
 function getApiKey(){return localStorage.getItem('anthropicApiKey')||'';}
 function saveApiKey(){
@@ -473,7 +522,7 @@ function getMonthData(){
   if(!data[currentYear][currentMonth])data[currentYear][currentMonth]={income:[],expense:[]};
   return data[currentYear][currentMonth];
 }
-function save(){localStorage.setItem('assetData',JSON.stringify(data));localStorage.setItem('assetDebts',JSON.stringify(debts));localStorage.setItem('assetGoals',JSON.stringify(goals));}
+function save(){localStorage.setItem('assetData',JSON.stringify(data));localStorage.setItem('assetDebts',JSON.stringify(debts));localStorage.setItem('assetGoals',JSON.stringify(goals));localStorage.setItem('assetCatLimits',JSON.stringify(catLimits));localStorage.setItem('assetExpGoals',JSON.stringify(expGoals));}
 function fmt(n){
   if(Math.abs(n)>=100000000)return'₩'+(n/100000000).toFixed(1)+'억';
   if(Math.abs(n)>=10000)return'₩'+Math.round(n/10000)+'만';
@@ -555,8 +604,23 @@ function renderAll(){
   document.getElementById('overviewGoalPct').textContent=goalPct+'%';
   document.getElementById('overviewGoalRemain').textContent=goalAmt>0&&savingAmt<goalAmt?`${fmtFull(goalAmt-savingAmt)} 더 필요`:goalAmt>0?'🎉 목표 달성!':'';
 
-  // Goal tab
-  document.getElementById('goalInput').value=goalAmt||'';
+  // Goal tab - 지출 감축 목표
+  const expGoalKey=`${currentYear}-${currentMonth}`;
+  const expGoalAmt=expGoals[expGoalKey]||0;
+  document.getElementById('expGoalInput').value=expGoalAmt||'';
+  if(expGoalAmt>0){
+    document.getElementById('expGoalProgressCard').style.display='';
+    document.getElementById('expGoalCurrent').textContent=fmtFull(totalExp);
+    document.getElementById('expGoalTargetLabel').textContent=`/ ${fmtFull(expGoalAmt)} 한도`;
+    const expPct=Math.min(100,Math.round(totalExp/expGoalAmt*100));
+    document.getElementById('expGoalFill').style.width=expPct+'%';
+    document.getElementById('expGoalFill').style.background=expPct>=100?'var(--red)':expPct>=80?'linear-gradient(90deg,var(--yellow),var(--red))':'linear-gradient(90deg,var(--green),var(--yellow))';
+    document.getElementById('expGoalStatus').textContent=expPct>=100?`🔴 한도 ${fmtFull(totalExp-expGoalAmt)} 초과!`:expPct>=80?`⚠️ 한도의 ${expPct}% 사용 중`:`✅ 한도의 ${expPct}% 사용 중`;
+    document.getElementById('expGoalRemain').textContent=totalExp<expGoalAmt?`${fmtFull(expGoalAmt-totalExp)} 남음`:'';
+  }else{
+    document.getElementById('expGoalProgressCard').style.display='none';
+  }
+  renderCatLimitList(expenses);
   if(goalAmt>0){
     document.getElementById('goalProgressCard').style.display='';
     document.getElementById('goalTips').style.display='';
@@ -608,19 +672,30 @@ function renderIncomeList(incomes){
 function renderExpenseList(expenses){
   const el=document.getElementById('expenseList');
   if(!expenses.length){el.innerHTML='<div class="empty-row">+ 추가 버튼으로 지출을 입력하세요</div>';return;}
-  el.innerHTML=expenses.map((item,i)=>`
-    <div class="table-row row-expense">
+  // 카테고리별 합계
+  const catTotals={};expenses.forEach(e=>{catTotals[e.cat]=(catTotals[e.cat]||0)+e.amount;});
+  const monthKey=`${currentYear}-${currentMonth}`;
+  const limits=catLimits[monthKey]||{};
+  el.innerHTML=expenses.map((item,i)=>{
+    const catTotal=catTotals[item.cat]||0;
+    const limit=limits[item.cat]||0;
+    const isOver=limit>0&&catTotal>limit;
+    return `
+    <div class="table-row row-expense" style="${isOver?'background:rgba(247,106,106,0.05)':''}">
       <div class="cell">${item.name}${item.note?`<div class="cell muted">${item.note}</div>`:''}</div>
       <div class="cell">
         <span class="tag expense" style="font-size:10px">${item.cat}</span>
         <span class="tag ${item.fixed==='fixed'?'fixed':'variable'}" style="font-size:10px;margin-left:2px">${item.fixed==='fixed'?'고정':'변동'}</span>
+        ${isOver?`<div style="font-size:10px;color:var(--red);margin-top:2px">🔴 한도 초과 (${fmtFull(catTotal)}/${fmtFull(limit)})</div>`:''}
+        ${limit>0&&!isOver?`<div style="font-size:10px;color:var(--text3);margin-top:2px">${fmtFull(catTotal)}/${fmtFull(limit)}</div>`:''}
       </div>
-      <div class="cell amount-cell" style="color:var(--red)">${fmtFull(item.amount)}</div>
+      <div class="cell amount-cell" style="color:${isOver?'var(--red)':'var(--red)'}">${fmtFull(item.amount)}</div>
       <div class="row-actions">
         <button class="edit-btn" onclick="editItem('expense',${i})" title="수정">✏️</button>
         <button class="del-btn" onclick="deleteItem('expense',${i})" title="삭제">✕</button>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 function renderDebtList(){
@@ -739,6 +814,56 @@ function renderTips(inc,exp,repay,surplus,debts,fixedExp,varExp){
   if(inc===0)tips.push('수입 탭에서 이번 달 수입을 입력해보세요.');
   if(!tips.length)tips.push('이번 달 데이터가 잘 입력됐어요 👍');
   document.getElementById('tipsList').innerHTML=tips.map(t=>`<li style="margin-bottom:6px">${t}</li>`).join('');
+}
+
+function renderCatLimitList(expenses){
+  const el=document.getElementById('catLimitList');
+  const monthKey=`${currentYear}-${currentMonth}`;
+  const limits=catLimits[monthKey]||{};
+  const catTotals={};(expenses||[]).forEach(e=>{catTotals[e.cat]=(catTotals[e.cat]||0)+e.amount;});
+  if(!Object.keys(limits).length){el.innerHTML='<div style="font-size:12px;color:var(--text3);margin-bottom:8px">아직 설정된 한도가 없어요. 아래에서 추가해보세요.</div>';return;}
+  el.innerHTML=Object.entries(limits).map(([cat,limit])=>{
+    const current=catTotals[cat]||0;
+    const pct=Math.min(100,Math.round(current/limit*100));
+    const isOver=current>limit;
+    return `<div style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <span style="font-size:13px;font-weight:600">${cat}</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:12px;color:${isOver?'var(--red)':'var(--text2)'};font-weight:${isOver?'700':'400'}">${fmtFull(current)} / ${fmtFull(limit)}</span>
+          <button onclick="deleteCatLimit('${cat}')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:12px">✕</button>
+        </div>
+      </div>
+      <div class="progress-bar" style="height:6px">
+        <div style="height:100%;width:${pct}%;border-radius:3px;background:${isOver?'var(--red)':pct>=80?'var(--yellow)':'var(--green)'};transition:width 0.3s"></div>
+      </div>
+      ${isOver?`<div style="font-size:11px;color:var(--red);margin-top:3px">🔴 ${fmtFull(current-limit)} 초과</div>`:`<div style="font-size:11px;color:var(--text3);margin-top:3px">${fmtFull(limit-current)} 남음</div>`}
+    </div>`;
+  }).join('');
+}
+
+function saveExpGoal(){
+  const amt=parseFloat(document.getElementById('expGoalInput').value)||0;
+  if(!amt){alert('목표 지출 한도를 입력하세요');return;}
+  expGoals[`${currentYear}-${currentMonth}`]=amt;
+  save();renderAll();
+}
+
+function addCatLimit(){
+  const cat=document.getElementById('limitCat').value;
+  const amt=parseFloat(document.getElementById('limitAmt').value)||0;
+  if(!amt){alert('한도 금액을 입력하세요');return;}
+  const monthKey=`${currentYear}-${currentMonth}`;
+  if(!catLimits[monthKey])catLimits[monthKey]={};
+  catLimits[monthKey][cat]=amt;
+  document.getElementById('limitAmt').value='';
+  save();renderAll();
+}
+
+function deleteCatLimit(cat){
+  const monthKey=`${currentYear}-${currentMonth}`;
+  if(catLimits[monthKey])delete catLimits[monthKey][cat];
+  save();renderAll();
 }
 
 function saveGoal(){
