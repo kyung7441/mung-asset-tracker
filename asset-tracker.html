@@ -307,8 +307,13 @@
 
     <!-- 지출 감축 목표 -->
     <div class="goal-card" style="border-color:var(--red)">
-      <div class="goal-header"><div class="goal-title">🔻 이번 달 지출 감축 목표</div></div>
-      <div class="form-group"><label class="form-label">목표 지출 한도 (원) — 예: 지금 -400만이면 350만으로 설정</label><input class="form-input" id="expGoalInput" type="number" placeholder="예: 3500000"></div>
+      <div class="goal-header"><div class="goal-title">🔻 이번 달 잔여금 목표</div></div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.7">
+        수입 − 지출 − 상환 = <b>실 잔여금</b> 기준이에요.<br>
+        지금 적자라면 마이너스로 입력하세요.<br>
+        예: 현재 -100만 → 목표 <b>-500000</b> (적자를 50만으로 줄이겠다)
+      </div>
+      <div class="form-group"><label class="form-label">목표 잔여금 (원, 마이너스 입력 가능)</label><input class="form-input" id="expGoalInput" type="text" inputmode="numeric" placeholder="예: -500000 또는 100000"></div>
       <button class="btn-save" style="width:100%;border-radius:var(--radius-sm);padding:12px;font-size:15px;font-weight:700;cursor:pointer;border:none;color:white;background:var(--red)" onclick="saveExpGoal()">목표 저장</button>
     </div>
     <div class="goal-card" id="expGoalProgressCard" style="display:none;border-color:var(--red)">
@@ -604,19 +609,35 @@ function renderAll(){
   document.getElementById('overviewGoalPct').textContent=goalPct+'%';
   document.getElementById('overviewGoalRemain').textContent=goalAmt>0&&savingAmt<goalAmt?`${fmtFull(goalAmt-savingAmt)} 더 필요`:goalAmt>0?'🎉 목표 달성!':'';
 
-  // Goal tab - 지출 감축 목표
+  // Goal tab - 잔여금 목표 (수입 - 지출 - 상환 기준)
   const expGoalKey=`${currentYear}-${currentMonth}`;
-  const expGoalAmt=expGoals[expGoalKey]||0;
-  document.getElementById('expGoalInput').value=expGoalAmt||'';
-  if(expGoalAmt>0){
+  const expGoalAmt=expGoals[expGoalKey]||0; // 목표 잔여금 (마이너스도 가능, 예: -50만 = 적자를 50만으로 줄이겠다)
+  document.getElementById('expGoalInput').value=expGoalAmt!==0?expGoalAmt:'';
+  if(expGoalAmt!==0||expGoals[expGoalKey]!==undefined){
     document.getElementById('expGoalProgressCard').style.display='';
-    document.getElementById('expGoalCurrent').textContent=fmtFull(totalExp);
-    document.getElementById('expGoalTargetLabel').textContent=`/ ${fmtFull(expGoalAmt)} 한도`;
-    const expPct=Math.min(100,Math.round(totalExp/expGoalAmt*100));
+    // surplus = 수입 - 지출 - 상환 (음수면 적자)
+    const surplusDisplay=surplus;
+    const goalDisplay=expGoalAmt;
+    document.getElementById('expGoalCurrent').textContent=fmtFull(surplusDisplay);
+    document.getElementById('expGoalCurrent').style.color=surplusDisplay>=0?'var(--green)':'var(--red)';
+    document.getElementById('expGoalTargetLabel').textContent=`목표: ${surplusDisplay>=0?'+':''}${fmtFull(goalDisplay)}`;
+    // 진행률: 목표가 양수면 달성률, 음수(적자 줄이기)면 개선률
+    let expPct=0, statusText='', remainText='';
+    if(goalDisplay>=0){
+      // 흑자 목표
+      expPct=goalDisplay>0?Math.min(100,Math.max(0,Math.round(surplusDisplay/goalDisplay*100))):surplusDisplay>=0?100:0;
+      statusText=surplusDisplay>=goalDisplay?`🎉 목표 달성! (+${fmtFull(surplusDisplay-goalDisplay)} 초과)`:surplusDisplay>=0?`✅ 흑자 ${fmtFull(surplusDisplay)} — 목표까지 ${fmtFull(goalDisplay-surplusDisplay)} 남음`:`🔴 현재 적자 ${fmtFull(Math.abs(surplusDisplay))} — 목표까지 ${fmtFull(goalDisplay-surplusDisplay)} 남음`;
+    }else{
+      // 적자 줄이기 목표 (예: 목표 -50만, 현재 -100만)
+      // 기준점: 지난달 적자가 없으니 0 기준으로 개선 비율 계산
+      const worstCase=goalDisplay*2; // 목표의 2배를 최악으로 가정
+      expPct=Math.min(100,Math.max(0,Math.round((surplusDisplay-worstCase)/(goalDisplay-worstCase)*100)));
+      statusText=surplusDisplay>=goalDisplay?`✅ 목표 달성! (현재 ${fmtFull(surplusDisplay)})`:`⚠️ 현재 ${fmtFull(surplusDisplay)} — 목표 ${fmtFull(goalDisplay)}까지 ${fmtFull(goalDisplay-surplusDisplay)} 개선 필요`;
+    }
     document.getElementById('expGoalFill').style.width=expPct+'%';
-    document.getElementById('expGoalFill').style.background=expPct>=100?'var(--red)':expPct>=80?'linear-gradient(90deg,var(--yellow),var(--red))':'linear-gradient(90deg,var(--green),var(--yellow))';
-    document.getElementById('expGoalStatus').textContent=expPct>=100?`🔴 한도 ${fmtFull(totalExp-expGoalAmt)} 초과!`:expPct>=80?`⚠️ 한도의 ${expPct}% 사용 중`:`✅ 한도의 ${expPct}% 사용 중`;
-    document.getElementById('expGoalRemain').textContent=totalExp<expGoalAmt?`${fmtFull(expGoalAmt-totalExp)} 남음`:'';
+    document.getElementById('expGoalFill').style.background=expPct>=100?'var(--green)':expPct>=50?'linear-gradient(90deg,var(--yellow),var(--green))':'linear-gradient(90deg,var(--red),var(--yellow))';
+    document.getElementById('expGoalStatus').textContent=statusText;
+    document.getElementById('expGoalRemain').textContent='';
   }else{
     document.getElementById('expGoalProgressCard').style.display='none';
   }
@@ -843,15 +864,49 @@ function renderCatLimitList(expenses){
 }
 
 function saveExpGoal(){
-  const amt=parseFloat(document.getElementById('expGoalInput').value)||0;
-  if(!amt){alert('목표 지출 한도를 입력하세요');return;}
+  const raw=document.getElementById('expGoalInput').value.replace(/,/g,'');
+  const amt=parseFloat(raw);
+  if(isNaN(amt)){alert('목표 잔여금을 입력하세요\n예: -500000 (적자 50만 목표) 또는 100000 (흑자 10만 목표)');return;}
   expGoals[`${currentYear}-${currentMonth}`]=amt;
   save();renderAll();
 }
 
+// 숫자 입력 시 콤마 포매팅
+function setupCommaInputs(){
+  const commaIds=['inc-amount','exp-amount','dbt-total','dbt-remain','dbt-monthly','goalInput','limitAmt'];
+  commaIds.forEach(id=>{
+    const el=document.getElementById(id);
+    if(!el)return;
+    el.addEventListener('input',function(){
+      const pos=this.selectionStart;
+      const raw=this.value.replace(/[^0-9]/g,'');
+      if(!raw){this.value='';return;}
+      const formatted=parseInt(raw,10).toLocaleString('ko-KR');
+      this.value=formatted;
+    });
+  });
+  // expGoalInput은 마이너스 허용
+  const expEl=document.getElementById('expGoalInput');
+  if(expEl){
+    expEl.addEventListener('input',function(){
+      const isNeg=this.value.startsWith('-');
+      const raw=this.value.replace(/[^0-9]/g,'');
+      if(!raw){this.value=isNeg?'-':'';return;}
+      const formatted=(isNeg?'-':'')+parseInt(raw,10).toLocaleString('ko-KR');
+      this.value=formatted;
+    });
+  }
+}
+
+// 콤마 제거 후 숫자 반환
+function parseCommaNum(id){
+  const val=(document.getElementById(id).value||'').replace(/,/g,'');
+  return parseFloat(val)||0;
+}
+
 function addCatLimit(){
   const cat=document.getElementById('limitCat').value;
-  const amt=parseFloat(document.getElementById('limitAmt').value)||0;
+  const amt=parseCommaNum('limitAmt');
   if(!amt){alert('한도 금액을 입력하세요');return;}
   const monthKey=`${currentYear}-${currentMonth}`;
   if(!catLimits[monthKey])catLimits[monthKey]={};
@@ -886,6 +941,7 @@ function openModal(type,idx=null){
   document.getElementById('saveBtn').style.display=type==='income-pdf'?'none':'';
   document.getElementById('saveBtn').textContent=isEdit?'수정 완료':'저장';
   if(type==='income-pdf')resetPdfSteps();
+  setTimeout(setupCommaInputs,50);
 }
 
 function editItem(type,i){
@@ -894,12 +950,12 @@ function editItem(type,i){
   if(type==='income'){
     document.getElementById('inc-name').value=item.name||'';
     document.getElementById('inc-type').value=item.type||'근로소득';
-    document.getElementById('inc-amount').value=item.amount||'';
+    document.getElementById('inc-amount').value=item.amount?item.amount.toLocaleString('ko-KR'):'';
     document.getElementById('inc-note').value=item.note||'';
   }else if(type==='expense'){
     document.getElementById('exp-name').value=item.name||'';
     document.getElementById('exp-cat').value=item.cat||'생활-기타';
-    document.getElementById('exp-amount').value=item.amount||'';
+    document.getElementById('exp-amount').value=item.amount?item.amount.toLocaleString('ko-KR'):'';
     document.getElementById('exp-fixed').value=item.fixed||'variable';
     document.getElementById('exp-note').value=item.note||'';
   }
@@ -909,9 +965,9 @@ function editDebt(i){
   const d=debts[i];
   openModal('debt',i);
   document.getElementById('dbt-name').value=d.name||'';
-  document.getElementById('dbt-total').value=d.total||'';
-  document.getElementById('dbt-remain').value=d.remain||'';
-  document.getElementById('dbt-monthly').value=d.monthly||'';
+  document.getElementById('dbt-total').value=d.total?d.total.toLocaleString('ko-KR'):'';
+  document.getElementById('dbt-remain').value=d.remain?d.remain.toLocaleString('ko-KR'):'';
+  document.getElementById('dbt-monthly').value=d.monthly?d.monthly.toLocaleString('ko-KR'):'';
   document.getElementById('dbt-rate').value=d.rate||'';
   document.getElementById('dbt-type').value=d.type||'사업대출';
   document.getElementById('dbt-note').value=d.note||'';
@@ -995,7 +1051,7 @@ function saveItem(){
   const isEdit=editingIndex!==null;
   if(currentModalType==='income'){
     const name=document.getElementById('inc-name').value.trim();
-    const amount=parseFloat(document.getElementById('inc-amount').value)||0;
+    const amount=parseCommaNum('inc-amount');
     const type=document.getElementById('inc-type').value;
     const note=document.getElementById('inc-note').value.trim();
     if(!name||!amount){alert('항목명과 금액을 입력하세요');return;}
@@ -1003,7 +1059,7 @@ function saveItem(){
     else md.income.push({name,amount,type,note});
   }else if(currentModalType==='expense'){
     const name=document.getElementById('exp-name').value.trim();
-    const amount=parseFloat(document.getElementById('exp-amount').value)||0;
+    const amount=parseCommaNum('exp-amount');
     const cat=document.getElementById('exp-cat').value;
     const fixed=document.getElementById('exp-fixed').value;
     const note=document.getElementById('exp-note').value.trim();
@@ -1012,9 +1068,9 @@ function saveItem(){
     else md.expense.push({name,amount,cat,fixed,note});
   }else if(currentModalType==='debt'){
     const name=document.getElementById('dbt-name').value.trim();
-    const total=parseFloat(document.getElementById('dbt-total').value)||0;
-    const remain=parseFloat(document.getElementById('dbt-remain').value)||0;
-    const monthly=parseFloat(document.getElementById('dbt-monthly').value)||0;
+    const total=parseCommaNum('dbt-total');
+    const remain=parseCommaNum('dbt-remain');
+    const monthly=parseCommaNum('dbt-monthly');
     const rate=parseFloat(document.getElementById('dbt-rate').value)||0;
     const type=document.getElementById('dbt-type').value;
     const note=document.getElementById('dbt-note').value.trim();
@@ -1030,6 +1086,7 @@ function deleteItem(type,index){if(!confirm('삭제할까요?'))return;getMonthD
 function deleteDebt(index){if(!confirm('삭제할까요?'))return;debts.splice(index,1);save();renderAll();}
 
 updateMonthLabel();checkApiKey();renderAll();
+setTimeout(setupCommaInputs, 100);
 </script>
 </body>
 </html>
