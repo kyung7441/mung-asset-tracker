@@ -261,7 +261,11 @@
 
   <div class="sec">
     <h2>오늘 쓴 돈</h2>
-    <p class="lead">하루치를 적어도 되고, 뱅크샐러드 이번 달 지출 합계를 한 번에 넣어도 돼요. 통신·구독·치아보험은 예산에서 이미 빠졌으니 여기 적지 마세요.</p>
+    <p class="lead">하루치를 적어도 되고, 뱅크샐러드 합계를 한 번에 넣어도 돼요.<br>
+      <strong>넣는 법 —</strong> 뱅샐 지출 중 <strong>식비·카페/간식·생활·교통·온라인쇼핑·패션/쇼핑·문화/여가·뷰티/미용·술/유흥·의료/건강</strong> 10개만 더하고,
+      거기서 <strong>교통에 섞인 화재공제 5만 원</strong>(‘새마을OO-OOO’)을 빼세요.<br>
+      금융·주거/통신·자동차·교육/학습은 예산에서 이미 빠졌으니 넣지 마세요.
+      (뱅샐이 새마을금고 이자를 ‘자동차’, 학자금을 ‘교육/학습’으로 잘못 넣어둬요.)</p>
     <div class="field">
       <input type="number" id="spendInput" inputmode="numeric" placeholder="32000" />
       <button id="spendAdd">기록</button>
@@ -438,7 +442,7 @@ const mem={};
 function load(k,fb){ try{const v=localStorage.getItem(k); return v!==null?JSON.parse(v):(k in mem?mem[k]:fb);}catch(e){return (k in mem)?mem[k]:fb;} }
 function save(k,v){ mem[k]=v; try{localStorage.setItem(k,JSON.stringify(v));}catch(e){} push(); }
 const CLOUD_KEY = "state";
-function snapshotState(){ return {cash,logs,vatInst,tasksD,cardFix,cardBill,redraw,subs,INCOME,csBal,_at:Date.now()}; }
+function snapshotState(){ return {cash,logs,vatInst,tasksD,cardFix,cardBill,redraw,subs,subsV:3,INCOME,csBal,_at:Date.now()}; }
 function push(){
   if(!uid || pulling) return;
   clearTimeout(pushT);
@@ -457,7 +461,8 @@ function applyCloud(d){
   if(d.cardFix){ cardFix=d.cardFix; save("v10.cardfix",cardFix); }
   if(d.cardBill){ cardBill=d.cardBill; save("v10.cardbill",cardBill); }
   if(d.redraw){ redraw=d.redraw; save("v10.redraw",redraw); }
-  if(typeof d.subs==="number"){ subs=d.subs; save("v10.subs2",subs); }
+  // subsV<3 은 구독료 이중 차감이 남아있던 옛 값이라 무시하고 새 기본값을 쓴다
+  if(typeof d.subs==="number" && d.subsV===3){ subs=d.subs; save("v10.subs3",subs); }
   if(d.INCOME && typeof d.INCOME.salary==="number"){ INCOME=d.INCOME; save("v10.income",INCOME); }
   if(typeof d.csBal==="number"){ csBal=d.csBal; save("v10.csbal",csBal); }
   pulling = false;
@@ -482,7 +487,7 @@ const LOANS = [
   {d:14, n:"카카오뱅크 마통 이자", a:31368},
   {d:14, n:"신한 카드론 상환", a:141510, from:"2026-11"},
   {d:20, n:"e하나새희망홀씨", a:621138},
-  {d:21, n:"시설자금대출 이자", a:1100000},
+  {d:21, n:"시설자금대출 이자", a:932430},
   {d:23, n:"버팀목 전세자금 이자", a:40000},
   {d:30, n:"교보 약관대출 이자", a:49808},
   {d:31, n:"학자금대출", a:100000, eom:true},
@@ -551,7 +556,7 @@ const INSTALLMENTS = [
   {n:"부가세 7월분 (하나)", a:150084, e:"2027년 1월 끝"},
 ];
 const PAST_LIVING = [
-  {n:"6월", a:2218374}, {n:"7월", a:2166400}, {n:"8월", a:1633825}, {n:"9월", a:1300000},
+  {n:"6월", a:2218374}, {n:"7월", a:2166400}, {n:"8월", a:1633825}, {n:"9월", a:1577397},
 ];
 
 /* ============ 상태 ============ */
@@ -562,9 +567,10 @@ let tasksD = load("v10.tasks", {});
 let cardFix= load("v10.cardfix", CARD_FIX_DEFAULT);
 let cardBill=load("v10.cardbill", {"2026-10":{shinhan:3900000, hana:1900000, hyundai:3800000}});
 let redraw = load("v10.redraw", {});
-// 뱅크샐러드 10개 카테고리에 안 찍히는 것만. 쿠팡 와우·젠스파크·마이박스는 뱅샐
-// '온라인쇼핑>서비스구독'에 찍히므로 여기서 제외 (이중 차감 방지)
-let subs   = load("v10.subs2", 236390);
+// 뱅크샐러드 생활비 10개 카테고리에 안 찍히는 것만 (이중 차감 방지).
+// KT 53,670 + 인터넷 17,600 + 어도비 46,860 + 라이나 치아보험 15,000
+// 더피플·클로드·젠스파크·쿠팡와우·마이박스·챗지피티는 가계부에 찍히므로 생활비로.
+let subs   = load("v10.subs3", 133130);
 let INCOME = load("v10.income", INCOME_DEFAULT);
 let csBal  = load("v10.csbal", 12220000);   // 현금서비스 3사 잔액
 let calCur = new Date(T.getFullYear(), T.getMonth(), 1);
@@ -691,7 +697,7 @@ function renderMonth(){
     ["대출·고정비", -b.loans, "대출 7건, 월세, 보험, 화재공제"],
     ["카드 고정부", -b.cf, "현금서비스 이자와 할부"],
     ["세금", -b.tax, vatInst? "부가세 무이자 할부 1회차" : "이번 달 납부분"],
-    ["통신·구독·치아보험", -b.subs, "KT, 인터넷, 어도비, 더피플, 치아보험"],
+    ["통신·구독·치아보험", -b.subs, "KT, 인터넷, 어도비, 라이나 치아보험"],
   ];
   br.innerHTML = rows.map(([k,a,s])=>
     `<div class="row"><span class="k">${k}<small>${s}</small></span><span class="v ${a>0?'pos':''}">${a>0?'+':''}${W(a)}</span></div>`
@@ -715,7 +721,7 @@ function renderMonth(){
     });
     save("v10.income", INCOME);
     const sv=parseInt(document.getElementById("subsInput").value,10);
-    if(!isNaN(sv)&&sv>=0){ subs=sv; save("v10.subs2",subs); }
+    if(!isNaN(sv)&&sv>=0){ subs=sv; save("v10.subs3",subs); }
     renderAll();
   };
 
@@ -873,16 +879,22 @@ function renderFlow(){
   const taxBy = {"2026-10":128333, "2026-11":121667, "2026-12":250000, "2027-01":250000};
   const data = months.map(k=>{
     const [y,m]=k.split("-").map(Number);
-    const s=new Date(y,m-1,10), e=new Date(y,m,9);
+    const s=new Date(y,m-1,1), e=new Date(y,m,0);   // 달력 월 (뱅크샐러드와 같은 기준)
     let loans=0; eachDay(s,e,(d)=>loanFixOnDay(d).forEach(it=> loans+=-it.a ));
-    const v = income - loans - cardFixSum(k) - taxBy[k];
+    const v = income - loans - cardFixSum(k) - taxBy[k] - subs;
     return {n:`${m}월`, a:v};
   });
-  const max=Math.max(...data.map(d=>d.a), 1);
-  document.getElementById("flowBars").innerHTML = data.map(d=>
-    `<div class="mb"><div class="ml"><span>${d.n}</span><b class="num">${W(d.a)}</b></div>
-     <div class="mt2"><i class="${d.a<1300000?"low":""}" style="width:${Math.max(2,d.a/max*100)}%"></i></div></div>`).join("")
-    + `<p class="lead" style="margin-top:4px;">9월 실제 생활비가 130만 원이었어요. 그 아래로 내려가는 달은 빨간색으로 표시돼요.</p>`;
+  const bt = data[0].a;                              // 이번 달 예산 = 기준선
+  const all = PAST_LIVING.concat(data.map(d=>({n:d.n, a:d.a, fut:true})));
+  const max = Math.max(...all.map(d=>d.a), 1);
+  document.getElementById("flowBars").innerHTML =
+    `<p class="lead" style="margin-top:0;">아래 4칸은 실제로 쓴 생활비, 그 아래는 앞으로 쓸 수 있는 예산이에요.
+     이번 달 예산 <strong>${W(bt)}</strong>을 넘긴 달은 빨간색이에요.</p>`
+    + all.map(d=>
+    `<div class="mb"><div class="ml"><span>${d.n}${d.fut?" 예산":""}</span><b class="num">${W(d.a)}</b></div>
+     <div class="mt2"><i class="${!d.fut && d.a>bt ? "low":""}" style="width:${Math.max(2,d.a/max*100)}%"></i></div></div>`).join("")
+    + `<p class="lead" style="margin-top:6px;">9월 실제 생활비는 ${W(1577397)}이었어요 (기차표 2명분 환급 제외).
+       추석 연휴가 껴서 평소보다 많아요.</p>`;
 
   document.getElementById("instList").innerHTML = INSTALLMENTS.map(i=>
     `<div class="row"><span class="k">${i.n}<small>${i.e}</small></span><span class="v num">${W(i.a)}</span></div>`).join("");
