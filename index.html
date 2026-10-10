@@ -1,0 +1,924 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>현금흐름</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+<style>
+  :root{
+    color-scheme: light;
+    --bg:#FFFFFF;
+    --surface:#F6F7F9;
+    --line:#EBEDF0;
+    --line-2:#DCDFE4;
+    --ink:#000000;
+    --ink-2:#5F646B;
+    --ink-3:#9AA0A6;
+    --accent:#2B4DFF;
+    --accent-soft:#EDF0FF;
+    --pos:#00875A;
+    --neg:#DC3A20;
+    --neg-soft:#FFF2EF;
+    --warn:#B06A00;
+    --warn-soft:#FFF6E6;
+    --tabbar-h:60px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;background:var(--surface);color:var(--ink);
+    font-family:"Pretendard Variable",Pretendard,-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+    font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;}
+  button,input{font-family:inherit;font-variant-numeric:tabular-nums;}
+  .num{letter-spacing:-0.02em;font-feature-settings:"tnum";}
+
+  .app{max-width:560px;margin:0 auto;min-height:100vh;background:var(--bg);
+    padding-bottom:calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 24px);}
+
+  .screen{display:none;}
+  .screen.on{display:block;}
+
+  /* ---------- hero ---------- */
+  .hero{padding:34px 22px 26px;}
+  .hero .cycle{font-size:13px;color:var(--ink-3);margin-bottom:14px;}
+  .hero .amount{font-size:44px;font-weight:800;line-height:1.05;letter-spacing:-0.035em;}
+  .hero .amount.neg{color:var(--neg);}
+  .hero .sub{font-size:14px;color:var(--ink-2);margin-top:9px;}
+  .hero .sub strong{font-weight:600;color:var(--ink);}
+
+  .gauge{margin-top:24px;}
+  .gauge .track{height:6px;background:var(--line);border-radius:3px;overflow:hidden;}
+  .gauge .track + .track{margin-top:7px;}
+  .gauge .fill{height:100%;border-radius:3px;transition:width .35s ease;}
+  .gauge .fill.spent{background:var(--accent);}
+  .gauge .fill.spent.over{background:var(--neg);}
+  .gauge .fill.time{background:var(--line-2);}
+  .gauge .keys{display:flex;gap:16px;font-size:12px;color:var(--ink-3);margin-top:10px;}
+  .gauge .keys i{width:8px;height:8px;border-radius:2px;display:inline-block;margin-right:5px;vertical-align:-1px;}
+  .verdict{margin-top:16px;font-size:14px;line-height:1.5;padding:12px 14px;border-radius:10px;}
+  .verdict.ok{background:var(--accent-soft);color:var(--accent);}
+  .verdict.over{background:var(--neg-soft);color:var(--neg);}
+  .verdict.easy{background:#EAF7F1;color:var(--pos);}
+
+  /* ---------- sections ---------- */
+  .sec{padding:26px 22px 0;}
+  .sec + .sec{padding-top:30px;}
+  h2{font-size:17px;font-weight:700;margin:0 0 4px;letter-spacing:-0.02em;}
+  .sec .lead{font-size:13px;color:var(--ink-2);margin:0 0 16px;line-height:1.6;}
+
+  .rows{border-top:1px solid var(--line);}
+  .row{display:flex;justify-content:space-between;align-items:baseline;gap:14px;
+    padding:13px 0;border-bottom:1px solid var(--line);font-size:14.5px;}
+  .row .k{color:var(--ink);}
+  .row .k small{display:block;font-size:12px;color:var(--ink-3);margin-top:3px;font-weight:400;}
+  .row .v{font-weight:600;white-space:nowrap;}
+  .row .v.pos{color:var(--pos);}
+  .row .v.neg{color:var(--neg);}
+  .row.sum{border-bottom:none;padding-top:16px;font-weight:700;}
+  .row.sum .v{font-size:17px;}
+  .row.muted .k,.row.muted .v{color:var(--ink-3);}
+
+  .toggle{display:flex;align-items:center;justify-content:space-between;gap:14px;
+    background:var(--surface);border-radius:12px;padding:14px 16px;margin-top:16px;}
+  .toggle .t{font-size:13.5px;line-height:1.5;}
+  .toggle .t b{display:block;font-weight:600;margin-bottom:2px;}
+  .toggle .t span{color:var(--ink-2);}
+  .sw{position:relative;width:46px;height:28px;flex-shrink:0;}
+  .sw input{opacity:0;width:0;height:0;position:absolute;}
+  .sw span{position:absolute;inset:0;background:var(--line-2);border-radius:14px;cursor:pointer;transition:background .2s;}
+  .sw span::after{content:"";position:absolute;width:22px;height:22px;border-radius:50%;background:#fff;
+    top:3px;left:3px;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.18);}
+  .sw input:checked + span{background:var(--accent);}
+  .sw input:checked + span::after{transform:translateX(18px);}
+  .sw input:focus-visible + span{outline:2px solid var(--accent);outline-offset:2px;}
+
+  /* ---------- input ---------- */
+  .field{display:flex;gap:8px;align-items:center;margin-top:12px;}
+  .field input{flex:1;min-width:0;padding:13px 14px;border:1px solid var(--line-2);border-radius:10px;
+    background:var(--bg);font-size:16px;font-weight:600;color:var(--ink);}
+  .field input:focus{outline:none;border-color:var(--accent);}
+  .field button{padding:13px 18px;border:none;border-radius:10px;background:var(--ink);color:#fff;
+    font-size:14px;font-weight:600;cursor:pointer;}
+  .field button:active{opacity:.75;}
+  .ghost{margin-top:14px;background:none;border:1px solid var(--line-2);color:var(--ink-2);
+    padding:9px 14px;border-radius:9px;font-size:13px;cursor:pointer;}
+
+  .cardin{border:1px solid var(--line);border-radius:12px;padding:15px 16px;margin-bottom:11px;}
+  .cardin .cn{font-size:14.5px;font-weight:700;margin-bottom:11px;}
+  .cardin label{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+  .cardin label:last-child{margin-bottom:0;}
+  .cardin label span{font-size:12.5px;color:var(--ink-2);width:86px;flex-shrink:0;}
+  .cardin input{flex:1;min-width:0;padding:10px 12px;border:1px solid var(--line-2);border-radius:9px;
+    background:var(--bg);font-size:15px;font-weight:600;color:var(--ink);}
+  .cardin input:focus{outline:none;border-color:var(--accent);}
+  .logs{margin-top:16px;}
+  .log{display:flex;justify-content:space-between;align-items:center;padding:11px 0;
+    border-bottom:1px solid var(--line);font-size:14px;}
+  .log .d{color:var(--ink-3);font-size:13px;}
+  .log .x{background:none;border:none;color:var(--ink-3);font-size:17px;cursor:pointer;padding:0 2px;line-height:1;}
+  .empty{padding:22px 0;font-size:13.5px;color:var(--ink-3);line-height:1.6;}
+
+  /* ---------- checklist ---------- */
+  .task{display:flex;gap:13px;padding:14px 0;border-bottom:1px solid var(--line);align-items:flex-start;}
+  .task .when{font-size:12px;color:var(--accent);font-weight:600;flex-shrink:0;width:46px;padding-top:2px;}
+  .task .when.none{color:var(--ink-3);}
+  .task .body{flex:1;min-width:0;}
+  .task .tt{font-size:14.5px;font-weight:600;line-height:1.45;}
+  .task .td{font-size:12.5px;color:var(--ink-2);margin-top:4px;line-height:1.6;}
+  .task.done .tt{color:var(--ink-3);text-decoration:line-through;}
+  .task.done .td{color:var(--ink-3);}
+  .task input[type=checkbox]{width:21px;height:21px;accent-color:var(--accent);margin-top:1px;flex-shrink:0;}
+
+  /* ---------- calendar ---------- */
+  .calbar{display:flex;align-items:center;justify-content:space-between;padding:0 22px 14px;}
+  .calbar .mt{font-size:17px;font-weight:700;}
+  .calbar .nav{display:flex;gap:6px;}
+  .calbar button{width:34px;height:34px;border:1px solid var(--line-2);background:var(--bg);
+    border-radius:9px;cursor:pointer;font-size:15px;color:var(--ink);line-height:1;}
+  .cal{display:grid;grid-template-columns:repeat(7,1fr);padding:0 14px;}
+  .cal .dw{text-align:center;font-size:11px;color:var(--ink-3);padding:6px 0 8px;}
+  .cal .dw.s{color:#C96A5B;}
+  .cel{aspect-ratio:1/1.08;display:flex;flex-direction:column;align-items:center;
+    justify-content:flex-start;padding-top:7px;border-radius:10px;cursor:pointer;position:relative;}
+  .cel.void{cursor:default;}
+  .cel .n{font-size:13.5px;color:var(--ink-2);line-height:1;}
+  .cel.today{background:var(--accent-soft);}
+  .cel.today .n{color:var(--accent);font-weight:700;}
+  .cel.pick{background:var(--ink);}
+  .cel.pick .n{color:#fff;font-weight:700;}
+  .cel.gone .n{color:var(--ink-3);opacity:.55;}
+  .pips{display:flex;gap:2.5px;margin-top:5px;height:5px;}
+  .pip{width:5px;height:5px;border-radius:50%;}
+  .pip.in{background:var(--pos);}
+  .pip.loan{background:var(--neg);}
+  .pip.card{background:var(--accent);}
+  .pip.tax{background:var(--warn);}
+  .pip.fix{background:var(--ink-3);}
+  .cel.pick .pip{outline:1px solid #fff;}
+  .lgd{display:flex;flex-wrap:wrap;gap:13px;padding:14px 22px 0;font-size:11.5px;color:var(--ink-3);}
+  .lgd span{display:inline-flex;align-items:center;gap:5px;}
+
+  .ev{display:flex;gap:12px;padding:13px 0;border-bottom:1px solid var(--line);align-items:flex-start;}
+  .ev .ed{font-size:12.5px;color:var(--ink-3);width:42px;flex-shrink:0;padding-top:2px;}
+  .ev .el{flex:1;font-size:14px;line-height:1.45;}
+  .ev .el em{font-style:normal;font-size:11.5px;color:var(--ink-3);display:block;margin-top:3px;}
+  .ev .ea{font-weight:600;font-size:14px;white-space:nowrap;}
+  .ev .ea.p{color:var(--pos);}
+  .ev .bal{font-size:11.5px;color:var(--ink-3);font-weight:400;display:block;text-align:right;margin-top:3px;}
+  .ev .bal.m{color:var(--neg);}
+
+  /* ---------- debts ---------- */
+  .dcard{border:1px solid var(--line);border-radius:14px;padding:17px;margin-bottom:12px;}
+  .dcard .dh{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;}
+  .dcard .dn{font-size:15.5px;font-weight:700;}
+  .dcard .dd{font-size:12.5px;color:var(--ink-3);}
+  .dcard .meter{height:5px;background:var(--line);border-radius:3px;overflow:hidden;margin-bottom:12px;}
+  .dcard .meter i{display:block;height:100%;background:var(--accent);}
+  .dcard .meter i.full{background:var(--neg);}
+  .dcard .dg{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .dcard .dg b{display:block;font-size:15px;font-weight:700;}
+  .dcard .dg span{font-size:11.5px;color:var(--ink-3);}
+  .dcard .note{margin-top:12px;font-size:12.5px;line-height:1.6;color:var(--ink-2);}
+
+  .dl{display:flex;gap:12px;padding:14px 0;border-bottom:1px solid var(--line);align-items:center;}
+  .dl .rk{font-size:12px;font-weight:700;color:var(--ink-3);width:17px;flex-shrink:0;}
+  .dl .di{flex:1;min-width:0;}
+  .dl .dnm{font-size:14.5px;font-weight:600;}
+  .dl .dmt{font-size:12px;color:var(--ink-3);margin-top:3px;line-height:1.5;}
+  .dl .dv{font-weight:700;font-size:14.5px;white-space:nowrap;}
+
+  /* ---------- flow / bars ---------- */
+  .mb{margin-bottom:17px;}
+  .mb .ml{display:flex;justify-content:space-between;font-size:13.5px;margin-bottom:7px;}
+  .mb .ml b{font-weight:700;}
+  .mb .mt2{height:9px;background:var(--line);border-radius:5px;overflow:hidden;}
+  .mb .mt2 i{display:block;height:100%;background:var(--accent);border-radius:5px;}
+  .mb .mt2 i.low{background:var(--neg);}
+
+  /* ---------- tabbar ---------- */
+  .tabs{position:fixed;left:0;right:0;bottom:0;height:calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+    padding-bottom:env(safe-area-inset-bottom);background:rgba(255,255,255,.94);
+    backdrop-filter:saturate(180%) blur(14px);border-top:1px solid var(--line);
+    display:flex;z-index:20;}
+  .tabs .inner{max-width:560px;margin:0 auto;display:flex;width:100%;}
+  .tabs button{flex:1;background:none;border:none;cursor:pointer;color:var(--ink-3);
+    font-size:11.5px;font-weight:600;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:4px;padding:0;}
+  .tabs button svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.7;
+    stroke-linecap:round;stroke-linejoin:round;}
+  .tabs button.on{color:var(--accent);}
+  .foot{padding:24px 22px 0;font-size:12px;color:var(--ink-3);line-height:1.7;}
+  /* 로그인 */
+  .gate{position:fixed;inset:0;background:var(--bg);z-index:60;display:flex;align-items:center;
+    justify-content:center;padding:24px;}
+  .gate.hide{display:none;}
+  .gate .box{width:100%;max-width:340px;}
+  .gate h1{font-size:23px;font-weight:800;letter-spacing:-0.03em;margin:0 0 6px;}
+  .gate p{font-size:13.5px;color:var(--ink-2);margin:0 0 24px;line-height:1.6;}
+  .gate input{width:100%;padding:14px;border:1px solid var(--line-2);border-radius:10px;
+    background:var(--bg);font-size:16px;color:var(--ink);margin-bottom:9px;}
+  .gate input:focus{outline:none;border-color:var(--accent);}
+  .gate button{width:100%;padding:14px;border:none;border-radius:10px;background:var(--ink);
+    color:#fff;font-size:15px;font-weight:600;cursor:pointer;margin-top:5px;}
+  .gate button:disabled{opacity:.45;}
+  .gate .err{font-size:13px;color:var(--neg);margin-top:12px;line-height:1.55;min-height:18px;}
+  .syncdot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--pos);
+    margin-right:6px;vertical-align:1px;}
+  .syncdot.off{background:var(--ink-3);}
+  .syncdot.bad{background:var(--neg);}
+  @media (prefers-reduced-motion: reduce){*{transition:none !important;}}
+</style>
+</head>
+<body>
+<div class="gate" id="gate">
+  <div class="box">
+    <h1>현금흐름</h1>
+    <p>기록이 모든 기기에서 같이 보이도록 로그인해요. 이 계정만 열람할 수 있어요.</p>
+    <input type="email" id="gEmail" placeholder="이메일" autocomplete="username" />
+    <input type="password" id="gPw" placeholder="비밀번호" autocomplete="current-password" />
+    <button id="gBtn">로그인</button>
+    <div class="err" id="gErr"></div>
+  </div>
+</div>
+
+<div class="app">
+
+<!-- ========== 1. 이번 달 ========== -->
+<section class="screen on" id="s-month">
+  <div class="hero">
+    <div class="cycle" id="cycleLabel">—</div>
+    <div class="amount num" id="remainAmt">0원</div>
+    <div class="sub" id="remainSub">—</div>
+    <div class="gauge">
+      <div class="track"><div class="fill spent" id="barSpent" style="width:0%"></div></div>
+      <div class="track"><div class="fill time" id="barTime" style="width:0%"></div></div>
+      <div class="keys">
+        <span><i style="background:var(--accent)"></i>쓴 돈</span>
+        <span><i style="background:var(--line-2)"></i>지난 날짜</span>
+      </div>
+      <div class="verdict ok" id="verdict">—</div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <h2>오늘 쓴 돈</h2>
+    <p class="lead">카드든 현금이든 생활비로 나간 돈을 합쳐서 적으면 돼요. 카드값은 따로 빼지 않아요.</p>
+    <div class="field">
+      <input type="number" id="spendInput" inputmode="numeric" placeholder="32000" />
+      <button id="spendAdd">기록</button>
+    </div>
+    <div class="logs" id="logList"></div>
+  </div>
+
+  <div class="sec">
+    <h2>예산이 나온 과정</h2>
+    <p class="lead">수입에서 반드시 나갈 돈을 먼저 뺀 나머지가 생활비 예산이에요.</p>
+    <div class="rows" id="budgetRows"></div>
+    <div class="toggle">
+      <div class="t">
+        <b>부가세 77만 원을 무이자 할부로</b>
+        <span>6개월로 나누면 월 128,333원. 예산이 64만 원 늘어나요.</span>
+      </div>
+      <label class="sw"><input type="checkbox" id="vatSw" /><span></span></label>
+    </div>
+  </div>
+
+  <div class="sec">
+    <h2>이번 달 할 일</h2>
+    <p class="lead">날짜가 붙은 건 그날 반드시, 나머지는 이번 달 안에.</p>
+    <div id="taskList"></div>
+  </div>
+
+  <div class="sec">
+    <h2>계정</h2>
+    <p class="lead" id="acctLine">—</p>
+    <button class="ghost" id="outBtn">로그아웃</button>
+  </div>
+
+  <div class="foot">
+    수입은 월급 257만 원과 숙박 정산 290만 원 기준이고, 정산금에서 부가세 몫 30만 원을 미리 뺐어요.
+    카드 고정부(이자·할부)는 명세서가 나오면 일정 탭에서 고쳐주세요.
+  </div>
+</section>
+
+<!-- ========== 2. 일정 ========== -->
+<section class="screen" id="s-cal">
+  <div class="sec" style="padding-top:28px;">
+    <h2>통장 잔액</h2>
+    <p class="lead">날짜별로 실제 통장에서 빠지는 돈이에요. 예산과 달리 카드 결제액 전체가 들어가요.</p>
+    <div class="field">
+      <input type="number" id="cashInput" inputmode="numeric" />
+      <button id="cashSave">잔액 저장</button>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="calbar">
+      <span class="mt" id="calTitle">—</span>
+      <span class="nav">
+        <button id="calPrev" aria-label="이전 달">‹</button>
+        <button id="calNow" aria-label="이번 달">○</button>
+        <button id="calNext" aria-label="다음 달">›</button>
+      </span>
+    </div>
+    <div class="cal" id="calGrid"></div>
+    <div class="lgd">
+      <span><i class="pip in"></i>입금</span><span><i class="pip loan"></i>대출</span>
+      <span><i class="pip card"></i>카드</span><span><i class="pip tax"></i>세금</span>
+      <span><i class="pip fix"></i>고정비</span>
+    </div>
+  </div>
+
+  <div class="sec">
+    <h2 id="evTitle">앞으로의 일정</h2>
+    <p class="lead" id="evLead">날짜를 누르면 그날 내역만 볼 수 있어요.</p>
+    <div id="evList"></div>
+  </div>
+
+  <div class="sec">
+    <h2>이번 달 카드 명세서</h2>
+    <p class="lead">명세서가 나오면 두 숫자만 옮겨 적으면 돼요. 총 청구액은 통장 잔액 계산에, 이자·할부는 생활비 예산에 쓰여요. 비워두면 지난 실적으로 추정해요.</p>
+    <div id="cardFixInputs"></div>
+  </div>
+</section>
+
+<!-- ========== 3. 빚 ========== -->
+<section class="screen" id="s-debt">
+  <div class="sec" style="padding-top:28px;">
+    <h2>현금서비스</h2>
+    <p class="lead">세 카드 모두 완납해야 한도가 새로 생겨요. 신한은 완납 즉시, 하나는 다음날, 현대는 즉시결제 직후 복원돼요.</p>
+    <div id="cardList"></div>
+  </div>
+
+  <div class="sec">
+    <h2>이번 달 재인출</h2>
+    <p class="lead">갚고 다시 뽑은 금액이에요. 이 숫자가 줄어든 만큼이 실제로 갚은 빚이에요.</p>
+    <div id="redrawInputs"></div>
+    <button class="ghost" id="redrawSave" style="background:var(--ink);color:#fff;border-color:var(--ink);padding:11px 18px;font-weight:600;">기록 저장</button>
+    <div class="rows" id="redrawHist" style="margin-top:18px;"></div>
+  </div>
+
+  <div class="sec">
+    <h2>상환 순서</h2>
+    <p class="lead">금리 높은 순. 2027년 6월 사잇돌, 2028년 3월 새희망홀씨가 끝나면서 두 번 속도가 붙어요.</p>
+    <div id="debtList"></div>
+    <div class="foot" id="debtSep" style="padding-left:0;padding-right:0;"></div>
+  </div>
+</section>
+
+<!-- ========== 4. 흐름 ========== -->
+<section class="screen" id="s-flow">
+  <div class="sec" style="padding-top:28px;">
+    <h2>달마다 쓸 수 있는 돈</h2>
+    <p class="lead">할부가 끝나면서 생활비 예산이 늘어나요. 부가세를 무이자 할부로 나눈 기준이에요.</p>
+    <div id="flowBars"></div>
+  </div>
+
+  <div class="sec">
+    <h2>끝나가는 할부</h2>
+    <p class="lead">이게 예산이 늘어나는 이유예요.</p>
+    <div class="rows" id="instList"></div>
+  </div>
+
+  <div class="sec">
+    <h2>실제 쓴 생활비</h2>
+    <p class="lead">뱅크샐러드 기록 기준이에요. 출장비처럼 회사에서 돌려받는 돈은 뺐어요.</p>
+    <div id="pastBars"></div>
+  </div>
+
+  <div class="foot">
+    12월이 전환점이에요. 종소세와 강의 할부가 끝나면서 카드 고정부가 102만 원에서 34만 원으로 줄어요.
+    대신 11월 14일부터 카드론 상환 141,510원이 새로 시작돼요.
+  </div>
+</section>
+
+<nav class="tabs"><div class="inner">
+  <button class="tb on" data-s="month">
+    <svg viewBox="0 0 24 24"><path d="M3 12h4l3 7 4-14 3 7h4"/></svg>이번 달</button>
+  <button class="tb" data-s="cal">
+    <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>일정</button>
+  <button class="tb" data-s="debt">
+    <svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="13" rx="2"/><path d="M2 10h20"/></svg>빚</button>
+  <button class="tb" data-s="flow">
+    <svg viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg>흐름</button>
+</div></nav>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut,
+         setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAxEJ_6XlOKvEo_KkXf0Iz1W1aiwTXvOgQ",
+  authDomain: "mung-cashflow.firebaseapp.com",
+  projectId: "mung-cashflow",
+  storageBucket: "mung-cashflow.firebasestorage.app",
+  messagingSenderId: "1084546858576",
+  appId: "1:1084546858576:web:4a847d9c6fe683ad5a9b55"
+};
+window.__fbReady = true;
+const fbApp = initializeApp(firebaseConfig);
+const auth  = getAuth(fbApp);
+const db    = getFirestore(fbApp);
+let uid = null, pushT = null, booted = false, pulling = false;
+
+const W = n => (n<0?"−":"") + Math.abs(Math.round(n)).toLocaleString("ko-KR") + "원";
+const P = n => String(n).padStart(2,"0");
+const ISO = d => d.getFullYear()+"-"+P(d.getMonth()+1)+"-"+P(d.getDate());
+const T = (()=>{const d=new Date();d.setHours(0,0,0,0);return d;})();
+const T_ISO = ISO(T);
+const lastDay = (y,m) => new Date(y,m,0).getDate();
+
+const mem={};
+function load(k,fb){ try{const v=localStorage.getItem(k); return v!==null?JSON.parse(v):(k in mem?mem[k]:fb);}catch(e){return (k in mem)?mem[k]:fb;} }
+function save(k,v){ mem[k]=v; try{localStorage.setItem(k,JSON.stringify(v));}catch(e){} push(); }
+const CLOUD_KEY = "state";
+function snapshotState(){ return {cash,logs,vatInst,tasksD,cardFix,cardBill,redraw,_at:Date.now()}; }
+function push(){
+  if(!uid || pulling) return;
+  clearTimeout(pushT);
+  pushT = setTimeout(()=>{
+    setDoc(doc(db,"users",uid,"app",CLOUD_KEY), snapshotState())
+      .then(()=>mark("saved")).catch(e=>mark("err", e.message));
+  }, 500);
+}
+function applyCloud(d){
+  if(!d) return;
+  pulling = true;
+  if(typeof d.cash==="number"){ cash=d.cash; save("v10.cash",cash); }
+  if(Array.isArray(d.logs)){ logs=d.logs; save("v10.logs",logs); }
+  if(typeof d.vatInst==="boolean"){ vatInst=d.vatInst; save("v10.vat",vatInst); }
+  if(d.tasksD){ tasksD=d.tasksD; save("v10.tasks",tasksD); }
+  if(d.cardFix){ cardFix=d.cardFix; save("v10.cardfix",cardFix); }
+  if(d.cardBill){ cardBill=d.cardBill; save("v10.cardbill",cardBill); }
+  if(d.redraw){ redraw=d.redraw; save("v10.redraw",redraw); }
+  pulling = false;
+  const vs=document.getElementById("vatSw"); if(vs) vs.checked=vatInst;
+  const ci=document.getElementById("cashInput"); if(ci) ci.value=cash;
+  renderAll();
+}
+function mark(kind, msg){
+  const el=document.getElementById("acctLine"); if(!el) return;
+  const mail = auth.currentUser ? auth.currentUser.email : "";
+  if(kind==="saved") el.innerHTML = `<span class="syncdot"></span>${mail} · 저장됨`;
+  else if(kind==="err") el.innerHTML = `<span class="syncdot bad"></span>${mail} · 저장 실패 (${msg||""})`;
+  else el.innerHTML = `<span class="syncdot off"></span>${mail} · 연결 중`;
+}
+function renderAll(){ renderMonth(); renderCal(); renderCardFix(); renderDebt(); renderFlow(); }
+
+/* ============ 설정값 ============ */
+const INCOME = { salary:2570000, settle:2900000, vatReserve:300000 };
+
+const LOANS = [
+  {d:1,  n:"표준사잇돌대출2", a:273310},
+  {d:14, n:"카카오뱅크 마통 이자", a:31368},
+  {d:14, n:"신한 카드론 상환", a:141510, from:"2026-11"},
+  {d:20, n:"e하나새희망홀씨", a:621138},
+  {d:21, n:"시설자금대출 이자", a:1100000},
+  {d:23, n:"버팀목 전세자금 이자", a:40000},
+  {d:30, n:"교보 약관대출 이자", a:49808},
+  {d:31, n:"학자금대출", a:100000, eom:true},
+];
+const FIXED = [
+  {d:23, n:"월세·관리비", a:360000},
+  {d:25, n:"교보생명 보험료", a:198000},
+  {d:25, n:"새마을금고 화재공제", a:50000},
+];
+const TAXES = [
+  {date:"2026-10-26", n:"부가세 예정고지", a:770000, vat:true},
+  {date:"2026-11-30", n:"종합소득세 중간예납", a:730000},
+  {date:"2027-01-25", n:"부가세 확정신고", a:870000},
+  {date:"2027-04-26", n:"부가세 예정고지", a:800000},
+  {date:"2027-05-31", n:"종합소득세", a:1460000},
+];
+/* 카드 고정부 = 현금서비스 이자 + 할부 (월별) */
+const CARD_FIX_DEFAULT = {
+  "2026-10":{shinhan:342622, hana:319302, hyundai:360169},
+  "2026-11":{shinhan:88322,  hana:222552, hyundai:294469},
+  "2026-12":{shinhan:88322,  hana:199386, hyundai:50169},
+  "2027-01":{shinhan:88322,  hana:199386, hyundai:50169},
+};
+const CS_PRINCIPAL = {shinhan:3100000, hana:1500000, hyundai:1520000};
+const ONETIME_SHARE = {shinhan:0.23, hana:0.00, hyundai:0.77};  // 9월 일시불 실적 비중
+const REDRAW_CAP = [
+  {k:"shinhan", n:"신한", cap:3100000, day:15, back:"완납 즉시"},
+  {k:"hana",    n:"하나", cap:1500000, day:15, back:"다음날"},
+  {k:"hyundai", n:"현대", cap:1600000, day:25, back:"즉시결제 직후"},
+];
+
+const TASKS = [
+  {id:"t1", when:"10/15", t:"신한 완납 → 310만 재인출 → 하나 결제", d:"정산금이 들어온 뒤 이 순서로. 신한을 완납해야 310만 한도가 살아나고, 그 돈으로 하나 190만을 내요. 하나는 다음날 150만이 돌아와요."},
+  {id:"t2", when:"10/20까지", t:"국세 무이자 할부 행사 확인", d:"10월 26일 부가세 77만 원용. 일시납하면 11월 9일 잔액이 −19만이 되고, 할부로 나누면 +45만이에요. 10월에서 가장 중요한 한 가지예요."},
+  {id:"t3", when:"월요일", t:"새마을금고 금리인하요구권 신청", d:"시설자금 2.2억이라 0.5%p만 내려도 월 9만 원. 거절돼도 불이익은 없어요."},
+  {id:"t4", when:"월요일", t:"카드 3사 금리인하요구권 신청", d:"현금서비스 19.9%도 심사 대상이에요. 앱에서 신청하면 되고, 2~3%p만 내려도 월 2~3만 원이에요."},
+  {id:"t5", when:"", t:"163만 원을 안 쓰는 계좌로 옮기기", d:"이 돈이 있어서 10월에 완충이 생겨요. 지금 원금 갚는 데 쓰면 15일에 그만큼 더 뽑아야 해서 제자리예요."},
+  {id:"t6", when:"10/25", t:"현대는 즉시결제와 재인출을 번갈아", d:"목돈이 없어도 부분결제 → 재인출을 반복하면 처리돼요. 한도 160만을 꽉 채워 쓰세요."},
+  {id:"t7", when:"", t:"어도비를 회사 명의 라이선스로 요청", d:"개인 비용 환급은 거절됐지만, 회사가 업무 라이선스를 직접 구매하는 건 별개 안건이에요. 팀에 VMD가 혼자라 1개 요청은 합리적이에요."},
+  {id:"t8", when:"", t:"AI 구독 중복 정리", d:"젠스파크 37,314원과 클로드·챗지피티는 쓰임이 상당히 겹쳐요. 하나 줄이면 월 3~7만 원이고, 참는 게 아니라 중복을 없애는 거예요."},
+  {id:"t9", when:"", t:"서민금융통합지원센터 1397 상담", d:"무료이고 신용에 영향 없어요. 연체가 없고 소득이 있는 지금이 선택지가 가장 많은 시점이에요."},
+  {id:"t10", when:"11/14", t:"카드론 첫 상환 141,510원", d:"신한 결제일과 같은 날이라 카드값에 합산될 수 있어요. 첫 청구서에서 확인하세요."},
+  {id:"t11", when:"11/30", t:"종소세 중간예납도 무이자 할부로", d:"73만 원. 일시납하면 11월 사이클이 다시 빠듯해져요. 할부로 나누면 30만 원을 덜 뽑을 여유가 생겨요."},
+];
+
+const DEBTS = [
+  {n:"현금서비스 3사", r:"19.3~19.9%", b:12220000, m:"재인출을 매달 줄이는 게 목표"},
+  {n:"표준사잇돌대출2", r:"13.67%", b:2575203, m:"월 273,310원 · 2027년 6월 완제"},
+  {n:"카카오뱅크 마이너스통장", r:"12.76%", b:2947951, m:"이자 월 31,368원 · 기한연장 때 인상됨"},
+  {n:"신한 카드론", r:"12.20%", b:3000000, m:"월 141,510원 · 2028년 10월 만기"},
+  {n:"e하나새희망홀씨", r:"6.93%", b:10590438, m:"월 621,138원 · 2028년 3월 완제"},
+  {n:"교보 종신보험 약관대출", r:"5.75%", b:9190000, m:"이자 월 44,036원 · 원금 상환 자유"},
+  {n:"청약저축담보대출 3건", r:"4.25~4.31%", b:1900000, m:"추가 한도 없음"},
+  {n:"교보 CI보험 약관대출", r:"3.57%", b:1940000, m:"이자 월 5,772원 · 원금 상환 자유"},
+];
+const CARD_STATE = [
+  {n:"신한카드", cap:3100000, used:3100000, day:"매월 14일", note:"10월은 15일에 완납하세요. 월급만으로는 14일에 17만 원이 모자라요."},
+  {n:"하나카드", cap:1500000, used:3000000, day:"매월 13일", note:"13일에 내지 말고 15일 정산금으로. 다음날 150만이 돌아와요."},
+  {n:"현대카드", cap:1600000, used:3120000, day:"매월 25일", note:"즉시결제 직후 바로 복원돼요. 나눠서 돌리면 목돈 없이 처리돼요."},
+];
+const INSTALLMENTS = [
+  {n:"무신사 · 네이버파이낸셜 (신한)", a:343300, e:"10월 끝"},
+  {n:"한의원 · 카카오스타일 · 서울시 (현대)", a:331400, e:"9월 끝"},
+  {n:"종합소득세 (현대)", a:244397, e:"11월 끝"},
+  {n:"클로드 강의 (하나)", a:23166, e:"11월 끝"},
+  {n:"부가세 7월분 (하나)", a:150084, e:"2027년 1월 끝"},
+];
+const PAST_LIVING = [
+  {n:"6월", a:2218374}, {n:"7월", a:2166400}, {n:"8월", a:1633825}, {n:"9월", a:1300000},
+];
+
+/* ============ 상태 ============ */
+let cash   = load("v10.cash", 1630000);
+let logs   = load("v10.logs", []);
+let vatInst= load("v10.vat", false);
+let tasksD = load("v10.tasks", {});
+let cardFix= load("v10.cardfix", CARD_FIX_DEFAULT);
+let cardBill=load("v10.cardbill", {"2026-10":{shinhan:3900000, hana:1900000, hyundai:3800000}});
+let redraw = load("v10.redraw", {});
+let calCur = new Date(T.getFullYear(), T.getMonth(), 1);
+let pick   = null;
+
+/* ============ 사이클 (10일 시작) ============ */
+function cycle(){
+  let s = new Date(T.getFullYear(), T.getMonth(), 10);
+  if(T < s) s = new Date(T.getFullYear(), T.getMonth()-1, 10);
+  const e = new Date(s.getFullYear(), s.getMonth()+1, 9);
+  return {start:s, end:e,
+    key: s.getFullYear()+"-"+P(s.getMonth()+1),
+    days: Math.round((e-s)/86400000)+1,
+    passed: Math.min(Math.round((T-s)/86400000)+1, Math.round((e-s)/86400000)+1)};
+}
+function cardFixSum(key){
+  const c = cardFix[key] || CARD_FIX_DEFAULT[key] || {shinhan:88322,hana:199386,hyundai:50169};
+  return c.shinhan + c.hana + c.hyundai;
+}
+function taxInCycle(c){
+  let sum = 0;
+  TAXES.forEach(t=>{
+    const d = new Date(t.date+"T00:00:00");
+    if(d>=c.start && d<=c.end) sum += (t.vat && vatInst) ? Math.round(t.a/6) : t.a;
+  });
+  return sum;
+}
+function loanFixOnDay(d){
+  const y=d.getFullYear(), m=d.getMonth()+1, dd=d.getDate(), key=y+"-"+P(m), out=[];
+  LOANS.forEach(l=>{
+    const day = l.eom ? lastDay(y,m) : Math.min(l.d, lastDay(y,m));
+    if(dd===day && (!l.from || key>=l.from)) out.push({n:l.n, a:-l.a, kind:"loan"});
+  });
+  FIXED.forEach(f=>{ if(dd===Math.min(f.d,lastDay(y,m))) out.push({n:f.n, a:-f.a, kind:"fix"}); });
+  return out;
+}
+function loansInCycle(c){
+  let sum = 0;
+  eachDay(c.start, c.end, (d)=>{ loanFixOnDay(d).forEach(it=> sum += -it.a); });
+  return sum;
+}
+function billFor(key, k, budgetTotal){
+  const b = cardBill[key];
+  if(b && b[k]) return b[k];
+  const cf = cardFix[key] || CARD_FIX_DEFAULT[key] || {shinhan:88322,hana:199386,hyundai:50169};
+  return Math.round(cf[k] + CS_PRINCIPAL[k] + Math.max(0,budgetTotal) * ONETIME_SHARE[k]);
+}
+function eachDay(a,b,fn){ const d=new Date(a); while(d<=b){ fn(new Date(d)); d.setDate(d.getDate()+1);} }
+
+function budget(){
+  const c = cycle();
+  const income = INCOME.salary + INCOME.settle - INCOME.vatReserve;
+  const loans  = loansInCycle(c);
+  const cf     = cardFixSum(c.key);
+  const tax    = taxInCycle(c);
+  return {c, income, loans, cf, tax, total: income - loans - cf - tax};
+}
+
+/* ============ 일정 생성 ============ */
+function dayItems(d, bt){
+  if(bt===undefined) bt = budget().total;
+  const y=d.getFullYear(), m=d.getMonth()+1, dd=d.getDate(), key=y+"-"+P(m), iso=ISO(d);
+  const out=[];
+  const after=(ym)=> key >= ym;
+  if(dd===10) out.push({n:"월급", a:INCOME.salary, kind:"in"});
+  if(dd===15) out.push({n:"숙박 정산금", a:INCOME.settle, kind:"in"});
+  LOANS.forEach(l=>{
+    const day = l.eom ? lastDay(y,m) : Math.min(l.d, lastDay(y,m));
+    if(dd===day && (!l.from || after(l.from))) out.push({n:l.n, a:-l.a, kind:"loan"});
+  });
+  FIXED.forEach(f=>{ if(dd===Math.min(f.d,lastDay(y,m))) out.push({n:f.n, a:-f.a, kind:"fix"}); });
+  // 카드 — 명세서를 넣었으면 그 값, 아니면 고정부 + 현금서비스 원금 + 예산 기준 일시불
+  const sh = billFor(key,"shinhan",bt), hn = billFor(key,"hana",bt), hy = billFor(key,"hyundai",bt);
+  if(dd===15){
+    out.push({n:"신한 완납 (14일분, 미룸)", a:-sh, kind:"card"});
+    out.push({n:"신한 재인출", a:3100000, kind:"card"});
+    out.push({n:"하나 결제 (13일분, 미룸)", a:-hn, kind:"card"});
+  }
+  if(dd===16) out.push({n:"하나 재인출", a:1500000, kind:"card"});
+  if(dd===25){
+    out.push({n:"현대 재인출", a:1600000, kind:"card"});
+    out.push({n:"현대카드 결제", a:-hy, kind:"card"});
+  }
+  TAXES.forEach(t=>{ if(t.date===iso) out.push({n:t.n + (t.vat&&vatInst?" (무이자 할부 1회차)":""), a:-((t.vat&&vatInst)?Math.round(t.a/6):t.a), kind:"tax"}); });
+  return out;
+}
+
+/* ============ 렌더: 이번 달 ============ */
+function renderMonth(){
+  const b = budget(), c = b.c;
+  const spent = logs.reduce((s,l)=>s+l.a, 0);
+  const remain = b.total - spent;
+
+  document.getElementById("cycleLabel").textContent =
+    `${c.start.getMonth()+1}월 ${c.start.getDate()}일 – ${c.end.getMonth()+1}월 ${c.end.getDate()}일 생활비`;
+  const amtEl = document.getElementById("remainAmt");
+  amtEl.textContent = W(remain) + (remain>=0 ? " 남음" : " 초과");
+  amtEl.className = "amount num" + (remain<0?" neg":"");
+
+  const left = Math.max(1, c.days - c.passed + 1);
+  document.getElementById("remainSub").innerHTML =
+    remain>=0 ? `남은 ${left}일 동안 하루 <strong>${W(remain/left)}</strong>`
+              : `예산을 넘겼어요. 다음 입금까지 ${left}일 남았어요.`;
+
+  const sp = b.total>0 ? Math.min(spent/b.total,1.6) : 1;
+  const tp = c.passed / c.days;
+  const bs = document.getElementById("barSpent");
+  bs.style.width = Math.min(sp,1)*100 + "%";
+  bs.classList.toggle("over", sp>1);
+  document.getElementById("barTime").style.width = tp*100 + "%";
+
+  const v = document.getElementById("verdict");
+  const gap = sp - tp;
+  if(sp>1){ v.className="verdict over"; v.textContent="예산을 넘었어요. 남은 날은 꼭 필요한 것만."; }
+  else if(gap>0.08){ v.className="verdict over"; v.textContent=`날짜보다 빠르게 쓰고 있어요. 이 속도면 ${W(b.total*sp/tp)}까지 가요.`; }
+  else if(gap<-0.08){ v.className="verdict easy"; v.textContent="날짜보다 여유 있게 가고 있어요."; }
+  else { v.className="verdict ok"; v.textContent="날짜 속도에 맞게 가고 있어요."; }
+
+  // 예산 내역
+  const br = document.getElementById("budgetRows");
+  const rows = [
+    ["월급", INCOME.salary, "매월 10일"],
+    ["숙박 정산금", INCOME.settle, "매월 15일"],
+    ["부가세 적립", -INCOME.vatReserve, "정산금 중 세무서에 낼 몫"],
+    ["대출·고정비", -b.loans, "대출 7건, 월세, 보험, 화재공제"],
+    ["카드 고정부", -b.cf, "현금서비스 이자와 할부"],
+    ["세금", -b.tax, vatInst? "부가세 무이자 할부 1회차" : "이번 달 납부분"],
+  ];
+  br.innerHTML = rows.map(([k,a,s])=>
+    `<div class="row"><span class="k">${k}<small>${s}</small></span><span class="v ${a>0?'pos':''}">${a>0?'+':''}${W(a)}</span></div>`
+  ).join("") + `<div class="row sum"><span class="k">생활비 예산</span><span class="v">${W(b.total)}</span></div>`;
+
+  // 지출 기록
+  const ll = document.getElementById("logList");
+  if(!logs.length){ ll.innerHTML = `<div class="empty">아직 기록이 없어요. 하루 끝에 총액만 적어두면 위 숫자가 줄어들어요.</div>`; }
+  else{
+    ll.innerHTML = logs.slice().reverse().map((l,i)=>
+      `<div class="log"><span class="d">${l.d}</span><span><b class="num">${W(l.a)}</b>
+       <button class="x" data-i="${logs.length-1-i}" aria-label="삭제">×</button></span></div>`).join("")
+      + `<button class="ghost" id="logClear">기록 전체 지우기</button>`;
+    ll.querySelectorAll(".x").forEach(x=>x.onclick=()=>{ logs.splice(+x.dataset.i,1); save("v10.logs",logs); renderMonth(); });
+    const lc=document.getElementById("logClear"); if(lc) lc.onclick=()=>{ logs=[]; save("v10.logs",logs); renderMonth(); };
+  }
+
+  // 할 일
+  document.getElementById("taskList").innerHTML = TASKS.map(t=>{
+    const done = !!tasksD[t.id];
+    return `<label class="task${done?" done":""}">
+      <input type="checkbox" data-t="${t.id}" ${done?"checked":""}/>
+      <div class="body"><div class="tt">${t.t}</div><div class="td">${t.d}</div></div>
+      <span class="when${t.when?"":" none"}">${t.when||"수시"}</span></label>`;
+  }).join("");
+  document.querySelectorAll("[data-t]").forEach(cb=>cb.onchange=()=>{
+    tasksD[cb.dataset.t]=cb.checked; save("v10.tasks",tasksD); renderMonth();
+  });
+}
+
+/* ============ 렌더: 일정 ============ */
+function renderCal(){
+  const y=calCur.getFullYear(), m=calCur.getMonth();
+  document.getElementById("calTitle").textContent = `${y}년 ${m+1}월`;
+  const g=document.getElementById("calGrid");
+  g.innerHTML = ["일","월","화","수","목","금","토"]
+    .map((d,i)=>`<div class="dw${i===0?" s":""}">${d}</div>`).join("");
+  const first=new Date(y,m,1).getDay(), nd=lastDay(y,m+1);
+  for(let i=0;i<first;i++) g.insertAdjacentHTML("beforeend",`<div class="cel void"></div>`);
+  const btC = budget().total;
+  for(let d=1;d<=nd;d++){
+    const dt=new Date(y,m,d), iso=ISO(dt), items=dayItems(dt,btC);
+    const kinds=[...new Set(items.map(i=>i.kind))];
+    const cls = ["cel", iso===T_ISO?"today":"", iso<T_ISO?"gone":"", pick===iso?"pick":""].join(" ");
+    g.insertAdjacentHTML("beforeend",
+      `<div class="${cls}" data-d="${iso}"><span class="n">${d}</span>
+       <span class="pips">${kinds.map(k=>`<i class="pip ${k==="fix"?"fix":k}"></i>`).join("")}</span></div>`);
+  }
+  g.querySelectorAll("[data-d]").forEach(c=>c.onclick=()=>{ pick = pick===c.dataset.d?null:c.dataset.d; renderCal(); renderEvents(); });
+  renderEvents();
+}
+function renderEvents(){
+  const list=document.getElementById("evList");
+  const title=document.getElementById("evTitle"), lead=document.getElementById("evLead");
+  let from, to, running = null;
+  if(pick){
+    from = new Date(pick+"T00:00:00"); to = new Date(pick+"T00:00:00");
+    title.textContent = `${from.getMonth()+1}월 ${from.getDate()}일`;
+    lead.textContent = "다시 누르면 전체 일정으로 돌아가요.";
+  }else{
+    from = new Date(T); to = new Date(T.getFullYear(), T.getMonth()+2, 0);
+    title.textContent = "앞으로의 일정";
+    lead.textContent = "오늘부터 두 달치예요. 잔액은 오늘 저장한 금액에서 이어 계산해요.";
+    running = cash;
+  }
+  const rows=[], bt = budget().total;
+  eachDay(from,to,(d)=>{
+    dayItems(d,bt).forEach(it=>{
+      if(running!==null) running += it.a;
+      rows.push({d, it, bal: running});
+    });
+  });
+  if(!rows.length){ list.innerHTML = `<div class="empty">이 날짜에는 예정된 내역이 없어요.</div>`; return; }
+  const kn={in:"입금",loan:"대출",card:"카드",tax:"세금",fix:"고정비"};
+  list.innerHTML = rows.map(r=>
+    `<div class="ev">
+      <span class="ed">${r.d.getMonth()+1}/${r.d.getDate()}</span>
+      <span class="el">${r.it.n}<em>${kn[r.it.kind]}</em></span>
+      <span><span class="ea ${r.it.a>0?"p":""}">${r.it.a>0?"+":""}${W(r.it.a)}</span>
+      ${r.bal!==null?`<span class="bal${r.bal<0?" m":""}">${W(r.bal)}</span>`:""}</span>
+    </div>`).join("");
+}
+function renderCardFix(){
+  const key = cycle().key;
+  const cf = cardFix[key] || CARD_FIX_DEFAULT[key] || {shinhan:0,hana:0,hyundai:0};
+  const bl = cardBill[key] || {};
+  document.getElementById("cardFixInputs").innerHTML =
+    [["shinhan","신한"],["hana","하나"],["hyundai","현대"]].map(([k,n])=>
+      `<div class="cardin">
+         <div class="cn">${n}카드</div>
+         <label><span>총 청구액</span><input type="number" inputmode="numeric" id="bl-${k}" value="${bl[k]||""}" placeholder="${W(billFor(key,k,budget().total)).replace("원","")}" /></label>
+         <label><span>그중 이자·할부</span><input type="number" inputmode="numeric" id="cf-${k}" value="${cf[k]||0}" /></label>
+       </div>`).join("")
+    + `<button class="ghost" id="cfSave" style="background:var(--ink);color:#fff;border-color:var(--ink);padding:12px 20px;font-weight:600;">저장</button>`;
+  document.getElementById("cfSave").onclick=()=>{
+    const nb={}, nf={};
+    ["shinhan","hana","hyundai"].forEach(k=>{
+      const b=+document.getElementById("bl-"+k).value||0;
+      if(b) nb[k]=b;
+      nf[k]=+document.getElementById("cf-"+k).value||0;
+    });
+    cardBill[key]=nb; cardFix[key]=nf;
+    save("v10.cardbill",cardBill); save("v10.cardfix",cardFix);
+    renderMonth(); renderCal(); renderCardFix(); renderFlow();
+  };
+}
+
+/* ============ 렌더: 빚 ============ */
+function renderDebt(){
+  document.getElementById("cardList").innerHTML = CARD_STATE.map(c=>{
+    const pct=Math.min(100,Math.round(c.used/c.cap*100));
+    return `<div class="dcard">
+      <div class="dh"><span class="dn">${c.n}</span><span class="dd">결제일 ${c.day}</span></div>
+      <div class="meter"><i class="${pct>=100?"full":""}" style="width:${pct}%"></i></div>
+      <div class="dg"><div><span>월 이용한도</span><b class="num">${W(c.cap)}</b></div>
+      <div><span>남은 원금</span><b class="num">${W(c.used)}</b></div></div>
+      <div class="note">${c.note}</div></div>`;
+  }).join("");
+
+  const key = cycle().key, cur = redraw[key] || {};
+  document.getElementById("redrawInputs").innerHTML = REDRAW_CAP.map(c=>
+    `<div class="field"><span style="width:38px;font-size:14px;">${c.n}</span>
+     <input type="number" inputmode="numeric" id="rd-${c.k}" placeholder="0" value="${cur[c.k]??""}" />
+     <span style="font-size:11.5px;color:var(--ink-3);width:62px;text-align:right;">한도 ${c.cap/10000}만</span></div>`).join("");
+  document.getElementById("redrawSave").onclick=()=>{
+    const r={}; REDRAW_CAP.forEach(c=>r[c.k]=+document.getElementById("rd-"+c.k).value||0);
+    redraw[key]=r; save("v10.redraw",redraw); renderDebt();
+  };
+  const keys=Object.keys(redraw).sort().reverse();
+  document.getElementById("redrawHist").innerHTML = keys.length
+    ? keys.map(k=>{ const v=redraw[k], s=REDRAW_CAP.reduce((a,c)=>a+(v[c.k]||0),0);
+        return `<div class="row"><span class="k">${k}<small>신한 ${W(v.shinhan||0)} · 하나 ${W(v.hana||0)} · 현대 ${W(v.hyundai||0)}</small></span><span class="v num">${W(s)}</span></div>`;}).join("")
+    : `<div class="empty">결제가 끝나면 카드별로 다시 뽑은 금액을 적어두세요. 매달 이 숫자가 줄어야 빚이 줄어요.</div>`;
+
+  document.getElementById("debtList").innerHTML = DEBTS.map((d,i)=>
+    `<div class="dl"><span class="rk">${i+1}</span>
+     <span class="di"><span class="dnm">${d.n}</span><span class="dmt">${d.r} · ${d.m}</span></span>
+     <span class="dv num">${W(d.b)}</span></div>`).join("");
+  document.getElementById("debtSep").innerHTML =
+    `따로 관리하는 두 건이에요. 버팀목 전세자금 3,200만 원(1.5%)은 만기 때 보증금으로 갚고,
+     기업일반자금 2억 2,000만 원(5.95%)은 이자만 매월 21일에 내다가 2028년 3월 21일에 만기예요.
+     연장이 되는지 미리 확인해 두세요.`;
+}
+
+/* ============ 렌더: 흐름 ============ */
+function renderFlow(){
+  const income = INCOME.salary + INCOME.settle - INCOME.vatReserve;
+  const months = ["2026-10","2026-11","2026-12","2027-01"];
+  const taxBy = {"2026-10":128333, "2026-11":121667, "2026-12":250000, "2027-01":250000};
+  const data = months.map(k=>{
+    const [y,m]=k.split("-").map(Number);
+    const s=new Date(y,m-1,10), e=new Date(y,m,9);
+    let loans=0; eachDay(s,e,(d)=>loanFixOnDay(d).forEach(it=> loans+=-it.a ));
+    const v = income - loans - cardFixSum(k) - taxBy[k];
+    return {n:`${m}월`, a:v};
+  });
+  const max=Math.max(...data.map(d=>d.a), 1);
+  document.getElementById("flowBars").innerHTML = data.map(d=>
+    `<div class="mb"><div class="ml"><span>${d.n}</span><b class="num">${W(d.a)}</b></div>
+     <div class="mt2"><i class="${d.a<1300000?"low":""}" style="width:${Math.max(2,d.a/max*100)}%"></i></div></div>`).join("")
+    + `<p class="lead" style="margin-top:4px;">9월 실제 생활비가 130만 원이었어요. 그 아래로 내려가는 달은 빨간색으로 표시돼요.</p>`;
+
+  document.getElementById("instList").innerHTML = INSTALLMENTS.map(i=>
+    `<div class="row"><span class="k">${i.n}<small>${i.e}</small></span><span class="v num">${W(i.a)}</span></div>`).join("");
+
+  const pmax=Math.max(...PAST_LIVING.map(p=>p.a));
+  document.getElementById("pastBars").innerHTML = PAST_LIVING.map(p=>
+    `<div class="mb"><div class="ml"><span>${p.n}</span><b class="num">${W(p.a)}</b></div>
+     <div class="mt2"><i style="width:${p.a/pmax*100}%"></i></div></div>`).join("");
+}
+
+/* ============ 이벤트 ============ */
+document.querySelectorAll(".tb").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll(".tb").forEach(x=>x.classList.remove("on"));
+  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("on"));
+  b.classList.add("on");
+  document.getElementById("s-"+b.dataset.s).classList.add("on");
+  window.scrollTo(0,0);
+});
+document.getElementById("spendAdd").onclick=()=>{
+  const el=document.getElementById("spendInput"), v=parseInt(el.value,10);
+  if(isNaN(v)||v<=0) return;
+  logs.push({d:`${T.getMonth()+1}/${T.getDate()}`, a:v});
+  save("v10.logs",logs); el.value=""; renderMonth();
+};
+document.getElementById("spendInput").addEventListener("keydown",e=>{ if(e.key==="Enter") document.getElementById("spendAdd").click(); });
+document.getElementById("vatSw").onchange=e=>{ vatInst=e.target.checked; save("v10.vat",vatInst); renderMonth(); renderCal(); };
+document.getElementById("cashSave").onclick=()=>{
+  const v=parseInt(document.getElementById("cashInput").value,10);
+  if(isNaN(v)) return; cash=v; save("v10.cash",cash); renderEvents();
+};
+document.getElementById("calPrev").onclick=()=>{ calCur.setMonth(calCur.getMonth()-1); pick=null; renderCal(); };
+document.getElementById("calNext").onclick=()=>{ calCur.setMonth(calCur.getMonth()+1); pick=null; renderCal(); };
+document.getElementById("calNow").onclick=()=>{ calCur=new Date(T.getFullYear(),T.getMonth(),1); pick=null; renderCal(); };
+
+document.getElementById("outBtn").onclick=()=>{ signOut(auth); };
+const gErr=document.getElementById("gErr"), gBtn=document.getElementById("gBtn");
+async function doLogin(){
+  const em=document.getElementById("gEmail").value.trim();
+  const pw=document.getElementById("gPw").value;
+  if(!em||!pw){ gErr.textContent="이메일과 비밀번호를 입력하세요."; return; }
+  gBtn.disabled=true; gErr.textContent="";
+  try{
+    await setPersistence(auth, browserLocalPersistence);
+    await signInWithEmailAndPassword(auth, em, pw);
+  }catch(e){
+    const m={"auth/invalid-credential":"이메일이나 비밀번호가 맞지 않아요.",
+             "auth/invalid-email":"이메일 형식이 올바르지 않아요.",
+             "auth/too-many-requests":"시도가 많아 잠시 막혔어요. 몇 분 뒤 다시 해주세요.",
+             "auth/network-request-failed":"네트워크에 연결되지 않았어요.",
+             "auth/api-key-not-valid.-please-pass-a-valid-api-key.":"Firebase 설정값이 잘못됐어요."};
+    gErr.textContent = m[e.code] || ("로그인에 실패했어요. ("+e.code+")");
+  }finally{ gBtn.disabled=false; }
+}
+gBtn.onclick=doLogin;
+document.getElementById("gPw").addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
+
+onAuthStateChanged(auth, (user)=>{
+  const gate=document.getElementById("gate");
+  if(!user){ uid=null; gate.classList.remove("hide"); return; }
+  uid=user.uid; gate.classList.add("hide"); mark("");
+  if(!booted){ booted=true; renderAll(); }
+  onSnapshot(doc(db,"users",uid,"app",CLOUD_KEY),
+    (snap)=>{ if(snap.exists()) applyCloud(snap.data()); else { push(); mark("saved"); } },
+    (e)=>mark("err", e.code));
+});
+
+document.getElementById("vatSw").checked = vatInst;
+document.getElementById("cashInput").value = cash;
+renderAll();
+</script>
+<script>
+// 모듈/SDK 로드 실패 시(오프라인, 차단 등) 빈 로그인 화면으로 멈추지 않도록 안내
+setTimeout(function(){
+  if(!window.__fbReady){
+    var e=document.getElementById("gErr");
+    if(e) e.textContent="연결에 실패했어요. 인터넷을 확인하고 새로고침해 주세요.";
+  }
+}, 6000);
+</script>
+</body>
+</html>
