@@ -438,7 +438,7 @@ const mem={};
 function load(k,fb){ try{const v=localStorage.getItem(k); return v!==null?JSON.parse(v):(k in mem?mem[k]:fb);}catch(e){return (k in mem)?mem[k]:fb;} }
 function save(k,v){ mem[k]=v; try{localStorage.setItem(k,JSON.stringify(v));}catch(e){} push(); }
 const CLOUD_KEY = "state";
-function snapshotState(){ return {cash,logs,vatInst,tasksD,cardFix,cardBill,redraw,subs,_at:Date.now()}; }
+function snapshotState(){ return {cash,logs,vatInst,tasksD,cardFix,cardBill,redraw,subs,INCOME,csBal,_at:Date.now()}; }
 function push(){
   if(!uid || pulling) return;
   clearTimeout(pushT);
@@ -457,7 +457,9 @@ function applyCloud(d){
   if(d.cardFix){ cardFix=d.cardFix; save("v10.cardfix",cardFix); }
   if(d.cardBill){ cardBill=d.cardBill; save("v10.cardbill",cardBill); }
   if(d.redraw){ redraw=d.redraw; save("v10.redraw",redraw); }
-  if(typeof d.subs==="number"){ subs=d.subs; save("v10.subs",subs); }
+  if(typeof d.subs==="number"){ subs=d.subs; save("v10.subs2",subs); }
+  if(d.INCOME && typeof d.INCOME.salary==="number"){ INCOME=d.INCOME; save("v10.income",INCOME); }
+  if(typeof d.csBal==="number"){ csBal=d.csBal; save("v10.csbal",csBal); }
   pulling = false;
   const vs=document.getElementById("vatSw"); if(vs) vs.checked=vatInst;
   const ci=document.getElementById("cashInput"); if(ci) ci.value=cash;
@@ -473,7 +475,7 @@ function mark(kind, msg){
 function renderAll(){ renderMonth(); renderCal(); renderCardFix(); renderDebt(); renderFlow(); }
 
 /* ============ 설정값 ============ */
-const INCOME = { salary:2570000, settle:2900000, vatReserve:300000 };
+const INCOME_DEFAULT = { salary:2570000, settle:2900000, vatReserve:300000 };
 
 const LOANS = [
   {d:1,  n:"표준사잇돌대출2", a:273310},
@@ -527,7 +529,7 @@ const TASKS = [
 ];
 
 const DEBTS = [
-  {n:"현금서비스 3사", r:"19.3~19.9%", b:12220000, m:"재인출을 매달 줄이는 게 목표"},
+  {n:"현금서비스 3사", r:"19.3~19.9%", b:12220000, cs:true, m:"재인출을 매달 줄이는 게 목표"},
   {n:"표준사잇돌대출2", r:"13.67%", b:2575203, m:"월 273,310원 · 2027년 6월 완제"},
   {n:"카카오뱅크 마이너스통장", r:"12.76%", b:2947951, m:"이자 월 31,368원 · 기한연장 때 인상됨"},
   {n:"신한 카드론", r:"12.20%", b:3000000, m:"월 141,510원 · 2028년 10월 만기"},
@@ -560,7 +562,11 @@ let tasksD = load("v10.tasks", {});
 let cardFix= load("v10.cardfix", CARD_FIX_DEFAULT);
 let cardBill=load("v10.cardbill", {"2026-10":{shinhan:3900000, hana:1900000, hyundai:3800000}});
 let redraw = load("v10.redraw", {});
-let subs   = load("v10.subs", 287094);   // 통신·인터넷·치아보험·구독료
+// 뱅크샐러드 10개 카테고리에 안 찍히는 것만. 쿠팡 와우·젠스파크·마이박스는 뱅샐
+// '온라인쇼핑>서비스구독'에 찍히므로 여기서 제외 (이중 차감 방지)
+let subs   = load("v10.subs2", 236390);
+let INCOME = load("v10.income", INCOME_DEFAULT);
+let csBal  = load("v10.csbal", 12220000);   // 현금서비스 3사 잔액
 let calCur = new Date(T.getFullYear(), T.getMonth(), 1);
 let pick   = null;
 
@@ -656,7 +662,7 @@ function renderMonth(){
   amtEl.textContent = W(remain) + (remain>=0 ? " 남음" : " 초과");
   amtEl.className = "amount num" + (remain<0?" neg":"");
 
-  const left = Math.max(1, c.days - c.passed + 1);
+  const left = Math.max(1, c.days - c.passed);   // 오늘 쓴 돈은 이미 집계됐으므로 오늘 제외
   window.__left = left;
   document.getElementById("remainSub").innerHTML =
     remain>=0 ? `남은 ${left}일 동안 하루 <strong>${W(remain/left)}</strong>`
@@ -685,17 +691,32 @@ function renderMonth(){
     ["대출·고정비", -b.loans, "대출 7건, 월세, 보험, 화재공제"],
     ["카드 고정부", -b.cf, "현금서비스 이자와 할부"],
     ["세금", -b.tax, vatInst? "부가세 무이자 할부 1회차" : "이번 달 납부분"],
-    ["통신·구독·치아보험", -b.subs, "KT, 어도비, 젠스파크, 쿠팡 와우 등"],
+    ["통신·구독·치아보험", -b.subs, "KT, 인터넷, 어도비, 더피플, 치아보험"],
   ];
   br.innerHTML = rows.map(([k,a,s])=>
     `<div class="row"><span class="k">${k}<small>${s}</small></span><span class="v ${a>0?'pos':''}">${a>0?'+':''}${W(a)}</span></div>`
   ).join("")
     + `<div class="row sum"><span class="k">생활비 예산</span><span class="v">${W(b.total)}</span></div>`
-    + `<div class="field" style="margin-top:14px;"><span style="font-size:12.5px;color:var(--ink-2);width:120px;flex-shrink:0;">통신·구독 합계</span>
-       <input type="number" inputmode="numeric" id="subsInput" value="${subs}" /><button id="subsSave">저장</button></div>`;
-  document.getElementById("subsSave").onclick=()=>{
-    const v=parseInt(document.getElementById("subsInput").value,10);
-    if(isNaN(v)||v<0) return; subs=v; save("v10.subs",subs); renderMonth();
+    + `<div class="foot" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line);">
+         <strong style="color:var(--ink);font-size:12.5px;">이 달 숫자 고치기</strong><br>
+         정산금은 성수기·비성수기에 따라 매달 달라요. 실제로 들어온 금액으로 바꿔주세요.
+       </div>`
+    + [["월급","salary",INCOME.salary],["숙박 정산금","settle",INCOME.settle],
+       ["부가세 적립","vatReserve",INCOME.vatReserve]].map(([lb,k,v])=>
+        `<div class="field" style="margin-top:8px;"><span style="font-size:12.5px;color:var(--ink-2);width:104px;flex-shrink:0;">${lb}</span>
+         <input type="number" inputmode="numeric" class="incIn" data-k="${k}" value="${v}" /></div>`).join("")
+    + `<div class="field" style="margin-top:8px;"><span style="font-size:12.5px;color:var(--ink-2);width:104px;flex-shrink:0;">통신·구독 합계</span>
+       <input type="number" inputmode="numeric" id="subsInput" value="${subs}" /></div>`
+    + `<div class="field" style="margin-top:10px;"><button id="budSave" style="width:100%;">저장</button></div>`;
+
+  document.getElementById("budSave").onclick=()=>{
+    document.querySelectorAll(".incIn").forEach(el=>{
+      const v=parseInt(el.value,10); if(!isNaN(v)&&v>=0) INCOME[el.dataset.k]=v;
+    });
+    save("v10.income", INCOME);
+    const sv=parseInt(document.getElementById("subsInput").value,10);
+    if(!isNaN(sv)&&sv>=0){ subs=sv; save("v10.subs2",subs); }
+    renderAll();
   };
 
   // 지출 기록
@@ -827,10 +848,18 @@ function renderDebt(){
         return `<div class="row"><span class="k">${k}<small>신한 ${W(v.shinhan||0)} · 하나 ${W(v.hana||0)} · 현대 ${W(v.hyundai||0)}</small></span><span class="v num">${W(s)}</span></div>`;}).join("")
     : `<div class="empty">결제가 끝나면 카드별로 다시 뽑은 금액을 적어두세요. 매달 이 숫자가 줄어야 빚이 줄어요.</div>`;
 
-  document.getElementById("debtList").innerHTML = DEBTS.map((d,i)=>
-    `<div class="dl"><span class="rk">${i+1}</span>
+  document.getElementById("debtList").innerHTML = DEBTS.map((d,i)=>{
+    const bal = d.cs ? csBal : d.b;
+    return `<div class="dl"><span class="rk">${i+1}</span>
      <span class="di"><span class="dnm">${d.n}</span><span class="dmt">${d.r} · ${d.m}</span></span>
-     <span class="dv num">${W(d.b)}</span></div>`).join("");
+     <span class="dv num">${W(bal)}</span></div>`;}).join("")
+    + `<div class="field" style="margin-top:12px;"><span style="font-size:12.5px;color:var(--ink-2);width:104px;flex-shrink:0;">현금서비스 잔액</span>
+       <input type="number" inputmode="numeric" id="csIn" value="${csBal}" /><button id="csSave">저장</button></div>
+       <div class="foot" style="padding-top:6px;">결제일마다 카드 앱에서 3사 합계를 확인해 고쳐주세요. 이 숫자가 줄어야 빚이 줄어요.</div>`;
+  document.getElementById("csSave").onclick=()=>{
+    const v=parseInt(document.getElementById("csIn").value,10);
+    if(isNaN(v)||v<0) return; csBal=v; save("v10.csbal",csBal); renderDebt();
+  };
   document.getElementById("debtSep").innerHTML =
     `따로 관리하는 두 건이에요. 버팀목 전세자금 3,200만 원(1.5%)은 만기 때 보증금으로 갚고,
      기업일반자금 2억 2,000만 원(5.95%)은 이자만 매월 21일에 내다가 2028년 3월 21일에 만기예요.
