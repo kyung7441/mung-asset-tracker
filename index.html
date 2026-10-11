@@ -442,7 +442,7 @@ const mem={};
 function load(k,fb){ try{const v=localStorage.getItem(k); return v!==null?JSON.parse(v):(k in mem?mem[k]:fb);}catch(e){return (k in mem)?mem[k]:fb;} }
 function save(k,v){ mem[k]=v; try{localStorage.setItem(k,JSON.stringify(v));}catch(e){} push(); }
 const CLOUD_KEY = "state";
-function snapshotState(){ return {cash,logs,vatInst,tasksD,cardFix,cardBill,redraw,subs,subsV:3,INCOME,csBal,_at:Date.now()}; }
+function snapshotState(){ return {cash,cashV:2,billV:2,logs,vatInst,tasksD,cardFix,cardBill,redraw,subs,subsV:3,INCOME,csBal,_at:Date.now()}; }
 function push(){
   if(!uid || pulling) return;
   clearTimeout(pushT);
@@ -454,12 +454,12 @@ function push(){
 function applyCloud(d){
   if(!d) return;
   pulling = true;
-  if(typeof d.cash==="number"){ cash=d.cash; save("v10.cash",cash); }
+  if(typeof d.cash==="number" && d.cashV===2){ cash=d.cash; save("v10.cash2",cash); }
   if(Array.isArray(d.logs)){ logs=d.logs; save("v10.logs",logs); }
   if(typeof d.vatInst==="boolean"){ vatInst=d.vatInst; save("v10.vat",vatInst); }
   if(d.tasksD){ tasksD=d.tasksD; save("v10.tasks",tasksD); }
   if(d.cardFix){ cardFix=d.cardFix; save("v10.cardfix",cardFix); }
-  if(d.cardBill){ cardBill=d.cardBill; save("v10.cardbill",cardBill); }
+  if(d.cardBill && d.billV===2){ cardBill=d.cardBill; save("v10.cardbill2",cardBill); }
   if(d.redraw){ redraw=d.redraw; save("v10.redraw",redraw); }
   // subsV<3 은 구독료 이중 차감이 남아있던 옛 값이라 무시하고 새 기본값을 쓴다
   if(typeof d.subs==="number" && d.subsV===3){ subs=d.subs; save("v10.subs3",subs); }
@@ -560,12 +560,12 @@ const PAST_LIVING = [
 ];
 
 /* ============ 상태 ============ */
-let cash   = load("v10.cash", 1630000);
+let cash   = load("v10.cash2", 2700000);
 let logs   = load("v10.logs", []);
 let vatInst= load("v10.vat", false);
 let tasksD = load("v10.tasks", {});
 let cardFix= load("v10.cardfix", CARD_FIX_DEFAULT);
-let cardBill=load("v10.cardbill", {"2026-10":{shinhan:3900000, hana:1900000, hyundai:3800000}});
+let cardBill=load("v10.cardbill2", {"2026-10":{shinhan:3620000, hana:1900000, hyundai:3800000}});
 let redraw = load("v10.redraw", {});
 // 뱅크샐러드 생활비 10개 카테고리에 안 찍히는 것만 (이중 차감 방지).
 // KT 53,670 + 인터넷 17,600 + 어도비 46,860 + 라이나 치아보험 15,000
@@ -642,12 +642,12 @@ function dayItems(d, bt){
   FIXED.forEach(f=>{ if(dd===Math.min(f.d,lastDay(y,m))) out.push({n:f.n, a:-f.a, kind:"fix"}); });
   // 카드 — 명세서를 넣었으면 그 값, 아니면 고정부 + 현금서비스 원금 + 예산 기준 일시불
   const sh = billFor(key,"shinhan",bt), hn = billFor(key,"hana",bt), hy = billFor(key,"hyundai",bt);
+  if(dd===13) out.push({n:"하나카드 결제", a:-hn, kind:"card"});
+  if(dd===14) out.push({n:"하나 재인출", a:1500000, kind:"card"});
   if(dd===15){
-    out.push({n:"신한 완납 (14일분, 미룸)", a:-sh, kind:"card"});
+    out.push({n:"신한 완납 (14일분, 정산금으로)", a:-sh, kind:"card"});
     out.push({n:"신한 재인출", a:3100000, kind:"card"});
-    out.push({n:"하나 결제 (13일분, 미룸)", a:-hn, kind:"card"});
   }
-  if(dd===16) out.push({n:"하나 재인출", a:1500000, kind:"card"});
   if(dd===25){
     out.push({n:"현대 재인출", a:1600000, kind:"card"});
     out.push({n:"현대카드 결제", a:-hy, kind:"card"});
@@ -822,7 +822,7 @@ function renderCardFix(){
       nf[k]=+document.getElementById("cf-"+k).value||0;
     });
     cardBill[key]=nb; cardFix[key]=nf;
-    save("v10.cardbill",cardBill); save("v10.cardfix",cardFix);
+    save("v10.cardbill2",cardBill); save("v10.cardfix",cardFix);
     renderMonth(); renderCal(); renderCardFix(); renderFlow();
   };
 }
@@ -929,7 +929,7 @@ document.getElementById("spendSet").onclick=()=>{
 document.getElementById("vatSw").onchange=e=>{ vatInst=e.target.checked; save("v10.vat",vatInst); renderMonth(); renderCal(); };
 document.getElementById("cashSave").onclick=()=>{
   const v=parseInt(document.getElementById("cashInput").value,10);
-  if(isNaN(v)) return; cash=v; save("v10.cash",cash); renderEvents();
+  if(isNaN(v)) return; cash=v; save("v10.cash2",cash); renderEvents();
 };
 document.getElementById("calPrev").onclick=()=>{ calCur.setMonth(calCur.getMonth()-1); pick=null; renderCal(); };
 document.getElementById("calNext").onclick=()=>{ calCur.setMonth(calCur.getMonth()+1); pick=null; renderCal(); };
