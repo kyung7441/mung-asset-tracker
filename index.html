@@ -153,6 +153,8 @@
   .pip.card{background:var(--accent);}
   .pip.tax{background:var(--warn);}
   .pip.fix{background:var(--ink-3);}
+  .pip.todo{background:transparent;border:1.5px solid var(--accent);width:6px;height:6px;}
+  .pip.todo.done{background:var(--ink-3);border-color:var(--ink-3);}
   .cel.pick .pip{outline:1px solid #fff;}
   .lgd{display:flex;flex-wrap:wrap;gap:13px;padding:14px 22px 0;font-size:11.5px;color:var(--ink-3);}
   .lgd span{display:inline-flex;align-items:center;gap:5px;}
@@ -165,6 +167,14 @@
   .ev .ea.p{color:var(--pos);}
   .ev .bal{font-size:11.5px;color:var(--ink-3);font-weight:400;display:block;text-align:right;margin-top:3px;}
   .ev .bal.m{color:var(--neg);}
+  .ev.past{opacity:.45;}
+  .ev.todo .el{font-weight:600;}
+  .ev.todo .el:before{content:"☐ ";color:var(--accent);}
+  .ev.todo.done .el{color:var(--ink-3);text-decoration:line-through;}
+  .ev.todo.done .el:before{content:"☑ ";color:var(--ink-3);text-decoration:none;}
+  .nowline{display:flex;align-items:center;gap:10px;margin:16px 0 4px;}
+  .nowline span{font-size:11.5px;font-weight:700;color:var(--accent);white-space:nowrap;}
+  .nowline i{flex:1;height:1px;background:var(--accent);opacity:.35;}
 
   /* ---------- debts ---------- */
   .dcard{border:1px solid var(--line);border-radius:14px;padding:17px;margin-bottom:12px;}
@@ -519,19 +529,24 @@ const REDRAW_CAP = [
   {k:"hyundai", n:"현대", cap:1600000, day:25, back:"즉시결제 직후"},
 ];
 
+/* date 가 있으면 달력에 점으로 찍히고, 없으면 "수시"로 맨 아래 모여요 */
 const TASKS = [
-  {id:"t1", when:"10/15", t:"신한 완납 → 310만 재인출 → 하나 결제", d:"정산금이 들어온 뒤 이 순서로. 신한을 완납해야 310만 한도가 살아나고, 그 돈으로 하나 190만을 내요. 하나는 다음날 150만이 돌아와요."},
-  {id:"t2", when:"10/20까지", t:"국세 무이자 할부 행사 확인", d:"10월 26일 부가세 77만 원용. 일시납하면 11월 9일 잔액이 −19만이 되고, 할부로 나누면 +45만이에요. 10월에서 가장 중요한 한 가지예요."},
-  {id:"t3", when:"월요일", t:"새마을금고 금리인하요구권 신청", d:"시설자금 2.2억이라 0.5%p만 내려도 월 9만 원. 거절돼도 불이익은 없어요."},
-  {id:"t4", when:"월요일", t:"카드 3사 금리인하요구권 신청", d:"현금서비스 19.9%도 심사 대상이에요. 앱에서 신청하면 되고, 2~3%p만 내려도 월 2~3만 원이에요."},
-  {id:"t5", when:"", t:"163만 원을 안 쓰는 계좌로 옮기기", d:"이 돈이 있어서 10월에 완충이 생겨요. 지금 원금 갚는 데 쓰면 15일에 그만큼 더 뽑아야 해서 제자리예요."},
-  {id:"t6", when:"10/25", t:"현대는 즉시결제와 재인출을 번갈아", d:"목돈이 없어도 부분결제 → 재인출을 반복하면 처리돼요. 한도 160만을 꽉 채워 쓰세요."},
-  {id:"t7", when:"", t:"어도비를 회사 명의 라이선스로 요청", d:"개인 비용 환급은 거절됐지만, 회사가 업무 라이선스를 직접 구매하는 건 별개 안건이에요. 팀에 VMD가 혼자라 1개 요청은 합리적이에요."},
-  {id:"t8", when:"", t:"AI 구독 중복 정리", d:"젠스파크 37,314원과 클로드·챗지피티는 쓰임이 상당히 겹쳐요. 하나 줄이면 월 3~7만 원이고, 참는 게 아니라 중복을 없애는 거예요."},
-  {id:"t9", when:"", t:"서민금융통합지원센터 1397 상담", d:"무료이고 신용에 영향 없어요. 연체가 없고 소득이 있는 지금이 선택지가 가장 많은 시점이에요."},
-  {id:"t10", when:"11/14", t:"카드론 첫 상환 141,510원", d:"신한 결제일과 같은 날이라 카드값에 합산될 수 있어요. 첫 청구서에서 확인하세요."},
-  {id:"t11", when:"11/30", t:"종소세 중간예납도 무이자 할부로", d:"73만 원. 일시납하면 11월 사이클이 다시 빠듯해져요. 할부로 나누면 30만 원을 덜 뽑을 여유가 생겨요."},
+  {id:"t1",  date:"2026-10-15", t:"신한 완납 → 하나 결제 → 하나 재인출", d:"정산금으로 신한 362만을 완납하고 하나 190만을 낸 뒤, 다음날 하나 150만을 다시 뽑는 순서예요."},
+  {id:"t2",  date:"2026-10-20", t:"국세 부분 무이자 할부 확인", d:"10/26 부가세 77만 원용. 6개월 부분 무이자로 가능한 걸 확인했어요. 4회차부터 수수료가 면제돼요."},
+  {id:"t12", date:"2026-10-25", t:"현대카드 317만 결제 → 160만 재인출", d:"목돈이 없으면 부분결제와 재인출을 번갈아 하면 돼요. 현대는 즉시결제 직후 바로 한도가 살아나요."},
+  {id:"t13", date:"2026-10-26", t:"부가세 77만 원 — 6개월 부분 무이자 할부로", d:"월 128,333원. 일시납하면 월말 잔액이 마이너스로 떨어져요. 10월에 남은 가장 중요한 한 가지예요."},
+  {id:"t10", date:"2026-11-14", t:"카드론 첫 상환 141,510원", d:"신한 결제일과 같은 날이라 카드값에 합산될 수 있어요. 첫 청구서에서 확인하세요."},
+  {id:"t11", date:"2026-11-30", t:"종소세 중간예납 73만 원도 할부로", d:"일시납하면 11월 사이클이 다시 빠듯해져요. 12월에 현대 할부 24만 원이 끝나니, 그 여유를 보고 개월 수를 정하세요."},
+  {id:"t3",  date:"", t:"새마을금고 금리인하요구권 신청", d:"시설자금 2.2억이라 0.5%p만 내려도 월 9만 원. 거절돼도 불이익은 없어요."},
+  {id:"t4",  date:"", t:"카드 3사 금리인하요구권 신청", d:"현금서비스 19.9%도 심사 대상이에요. 앱에서 신청하면 되고, 2~3%p만 내려도 월 2~3만 원이에요."},
+  {id:"t14", date:"", t:"신한 310만을 다시 뽑지 않고 버티기", d:"10월에 재인출을 건너뛰었어요. 이 상태를 유지하면 현금서비스가 처음으로 310만 원 줄어든 채로 굳어져요. 이번 달 가장 큰 성과예요."},
+  {id:"t7",  date:"", t:"어도비를 회사 명의 라이선스로 요청", d:"개인 비용 환급은 거절됐지만, 회사가 업무 라이선스를 직접 사는 건 별개 안건이에요. 팀에 VMD가 혼자라 1개 요청은 합리적이에요."},
+  {id:"t8",  date:"", t:"AI 구독 중복 정리", d:"젠스파크 37,314원과 클로드·챗지피티는 쓰임이 상당히 겹쳐요. 하나 줄이면 월 3~7만 원이고, 참는 게 아니라 중복을 없애는 거예요."},
+  {id:"t9",  date:"", t:"서민금융통합지원센터 1397 상담", d:"무료이고 신용에 영향 없어요. 연체가 없고 소득이 있는 지금이 선택지가 가장 많은 시점이에요."},
 ];
+const TASK_BY_DATE = TASKS.reduce((m,t)=>{ if(t.date)(m[t.date]=m[t.date]||[]).push(t); return m; }, {});
+function fmtWhen(t){ if(!t.date) return "수시";
+  const [,m,d] = t.date.split("-"); return `${+m}/${+d}`; }
 
 const DEBTS = [
   {n:"현금서비스 3사", r:"19.3~19.9%", b:12220000, cs:true, m:"재인출을 매달 줄이는 게 목표"},
@@ -743,10 +758,10 @@ function renderMonth(){
     return `<label class="task${done?" done":""}">
       <input type="checkbox" data-t="${t.id}" ${done?"checked":""}/>
       <div class="body"><div class="tt">${t.t}</div><div class="td">${t.d}</div></div>
-      <span class="when${t.when?"":" none"}">${t.when||"수시"}</span></label>`;
+      <span class="when${t.date?"":" none"}">${fmtWhen(t)}</span></label>`;
   }).join("");
   document.querySelectorAll("[data-t]").forEach(cb=>cb.onchange=()=>{
-    tasksD[cb.dataset.t]=cb.checked; save("v10.tasks",tasksD); renderMonth();
+    tasksD[cb.dataset.t]=cb.checked; save("v10.tasks",tasksD); renderMonth(); renderCal();
   });
 }
 
@@ -763,10 +778,13 @@ function renderCal(){
   for(let d=1;d<=nd;d++){
     const dt=new Date(y,m,d), iso=ISO(dt), items=dayItems(dt,btC);
     const kinds=[...new Set(items.map(i=>i.kind))];
+    const td = TASK_BY_DATE[iso] || [];
+    let pips = kinds.map(k=>`<i class="pip ${k==="fix"?"fix":k}"></i>`).join("");
+    if(td.length) pips += `<i class="pip todo${td.every(t=>tasksD[t.id])?" done":""}"></i>`;
     const cls = ["cel", iso===T_ISO?"today":"", iso<T_ISO?"gone":"", pick===iso?"pick":""].join(" ");
     g.insertAdjacentHTML("beforeend",
       `<div class="${cls}" data-d="${iso}"><span class="n">${d}</span>
-       <span class="pips">${kinds.map(k=>`<i class="pip ${k==="fix"?"fix":k}"></i>`).join("")}</span></div>`);
+       <span class="pips">${pips}</span></div>`);
   }
   g.querySelectorAll("[data-d]").forEach(c=>c.onclick=()=>{ pick = pick===c.dataset.d?null:c.dataset.d; renderCal(); renderEvents(); });
   renderEvents();
@@ -780,27 +798,51 @@ function renderEvents(){
     title.textContent = `${from.getMonth()+1}월 ${from.getDate()}일`;
     lead.textContent = "다시 누르면 전체 일정으로 돌아가요.";
   }else{
-    from = new Date(T); to = new Date(T.getFullYear(), T.getMonth()+2, 0);
-    title.textContent = "앞으로의 일정";
-    lead.textContent = "오늘부터 두 달치예요. 잔액은 오늘 저장한 금액에서 이어 계산해요.";
-    running = cash;
+    from = new Date(T.getFullYear(), T.getMonth(), 1);          // 이번 달 1일부터
+    to   = new Date(T.getFullYear(), T.getMonth()+2, 0);
+    title.textContent = "이번 달과 다음 달";
+    lead.textContent = "지난 날짜는 흐리게 보여요. 잔액은 오늘 저장한 금액에서 이어 계산해요.";
   }
   const rows=[], bt = budget().total;
   eachDay(from,to,(d)=>{
+    const iso = ISO(d), past = iso < T_ISO;
+    // 그날 할 일을 먼저
+    (TASK_BY_DATE[iso]||[]).forEach(t=> rows.push({d, past, task:t}));
+    // 그날 돈 내역
     dayItems(d,bt).forEach(it=>{
-      if(running!==null) running += it.a;
-      rows.push({d, it, bal: running});
+      if(!pick && !past){ if(running===null) running = cash; running += it.a; }
+      rows.push({d, past, it, bal: (!pick && !past) ? running : null});
     });
   });
   if(!rows.length){ list.innerHTML = `<div class="empty">이 날짜에는 예정된 내역이 없어요.</div>`; return; }
   const kn={in:"입금",loan:"대출",card:"카드",tax:"세금",fix:"고정비"};
-  list.innerHTML = rows.map(r=>
-    `<div class="ev">
+  let shownNow = pick ? true : false;
+  const html = rows.map(r=>{
+    let pre = "";
+    if(!shownNow && !r.past){ shownNow = true; pre = `<div class="nowline"><span>오늘</span><i></i></div>`; }
+    if(r.task){
+      const done = !!tasksD[r.task.id];
+      return pre + `<div class="ev todo${done?" done":""}${r.past?" past":""}">
+        <span class="ed">${r.d.getMonth()+1}/${r.d.getDate()}</span>
+        <span class="el">${r.task.t}<em>할 일</em></span></div>`;
+    }
+    return pre + `<div class="ev${r.past?" past":""}">
       <span class="ed">${r.d.getMonth()+1}/${r.d.getDate()}</span>
       <span class="el">${r.it.n}<em>${kn[r.it.kind]}</em></span>
       <span><span class="ea ${r.it.a>0?"p":""}">${r.it.a>0?"+":""}${W(r.it.a)}</span>
       ${r.bal!==null?`<span class="bal${r.bal<0?" m":""}">${W(r.bal)}</span>`:""}</span>
-    </div>`).join("");
+    </div>`;
+  }).join("");
+
+  // 날짜 없는 할 일은 맨 아래 따로
+  const anytime = pick ? [] : TASKS.filter(t=>!t.date);
+  const extra = anytime.length ? `
+    <div class="nowline" style="margin-top:22px;"><span>수시</span><i></i></div>`
+    + anytime.map(t=>{ const done=!!tasksD[t.id];
+        return `<div class="ev todo${done?" done":""}">
+          <span class="ed">—</span>
+          <span class="el">${t.t}<em>할 일</em></span></div>`; }).join("") : "";
+  list.innerHTML = html + extra;
 }
 function renderCardFix(){
   const key = cycle().key;
