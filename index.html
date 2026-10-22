@@ -452,7 +452,7 @@ const mem={};
 function load(k,fb){ try{const v=localStorage.getItem(k); return v!==null?JSON.parse(v):(k in mem?mem[k]:fb);}catch(e){return (k in mem)?mem[k]:fb;} }
 function save(k,v){ mem[k]=v; try{localStorage.setItem(k,JSON.stringify(v));}catch(e){} push(); }
 const CLOUD_KEY = "state";
-function snapshotState(){ return {cash,cashV:2,billV:2,logs,vatInst,tasksD,cardFix,cardBill,redraw,subs,subsV:3,INCOME,csBal,_at:Date.now()}; }
+function snapshotState(){ return {cash,cashV:3,billV:2,logs,vatInst,tasksD,cardFix,cardBill,redraw,subs,subsV:3,csV:2,INCOME,csBal,_at:Date.now()}; }
 function push(){
   if(!uid || pulling) return;
   clearTimeout(pushT);
@@ -464,7 +464,7 @@ function push(){
 function applyCloud(d){
   if(!d) return;
   pulling = true;
-  if(typeof d.cash==="number" && d.cashV===2){ cash=d.cash; save("v10.cash2",cash); }
+  if(typeof d.cash==="number" && d.cashV===3){ cash=d.cash; save("v10.cash3",cash); }
   if(Array.isArray(d.logs)){ logs=d.logs; save("v10.logs",logs); }
   if(typeof d.vatInst==="boolean"){ vatInst=d.vatInst; save("v10.vat",vatInst); }
   if(d.tasksD){ tasksD=d.tasksD; save("v10.tasks",tasksD); }
@@ -474,7 +474,7 @@ function applyCloud(d){
   // subsV<3 은 구독료 이중 차감이 남아있던 옛 값이라 무시하고 새 기본값을 쓴다
   if(typeof d.subs==="number" && d.subsV===3){ subs=d.subs; save("v10.subs3",subs); }
   if(d.INCOME && typeof d.INCOME.salary==="number"){ INCOME=d.INCOME; save("v10.income",INCOME); }
-  if(typeof d.csBal==="number"){ csBal=d.csBal; save("v10.csbal",csBal); }
+  if(typeof d.csBal==="number" && d.csV===2){ csBal=d.csBal; save("v10.csbal2",csBal); }
   pulling = false;
   const vs=document.getElementById("vatSw"); if(vs) vs.checked=vatInst;
   const ci=document.getElementById("cashInput"); if(ci) ci.value=cash;
@@ -522,6 +522,10 @@ const CARD_FIX_DEFAULT = {
   "2027-01":{shinhan:88322,  hana:211217, hyundai:50169},
 };
 const CS_PRINCIPAL = {shinhan:3100000, hana:1500000, hyundai:1520000};
+/* 신한 재인출 — 기본은 결제 당일(15일) 310만. 달라지는 달만 여기에 */
+const SHINHAN_DRAW = {
+  "2026-10": {day:23, a:2900000},   // 10/15엔 안 뽑음. 10/23 월세 직전에 필요한 만큼만 (310만 중 290만)
+};
 const ONETIME_SHARE = {shinhan:1.00, hana:0.00, hyundai:0.00};  // 10월부터 생활비는 신한카드로만
 const REDRAW_CAP = [
   {k:"shinhan", n:"신한", cap:3100000, day:15, back:"완납 즉시"},
@@ -549,7 +553,7 @@ function fmtWhen(t){ if(!t.date) return "수시";
   const [,m,d] = t.date.split("-"); return `${+m}/${+d}`; }
 
 const DEBTS = [
-  {n:"현금서비스 3사", r:"19.3~19.9%", b:12220000, cs:true, m:"재인출을 매달 줄이는 게 목표"},
+  {n:"현금서비스 3사", r:"19.3~19.9%", b:9120000, cs:true, m:"10월에 신한 310만 상환 — 처음으로 줄었어요"},
   {n:"표준사잇돌대출2", r:"13.67%", b:2575203, m:"월 273,310원 · 2027년 6월 완제"},
   {n:"카카오뱅크 마이너스통장", r:"12.76%", b:2947951, m:"이자 월 31,368원 · 기한연장 때 인상됨"},
   {n:"신한 카드론", r:"12.20%", b:3000000, m:"월 141,510원 · 2028년 10월 만기"},
@@ -575,19 +579,19 @@ const PAST_LIVING = [
 ];
 
 /* ============ 상태 ============ */
-let cash   = load("v10.cash2", 2700000);
+let cash   = load("v10.cash3", 0);
 let logs   = load("v10.logs", []);
 let vatInst= load("v10.vat", false);
 let tasksD = load("v10.tasks", {});
 let cardFix= load("v10.cardfix", CARD_FIX_DEFAULT);
-let cardBill=load("v10.cardbill2", {"2026-10":{shinhan:3620000, hana:1900000, hyundai:3170000}});
+let cardBill=load("v10.cardbill2", {"2026-10":{shinhan:3620000, hana:1900000, hyundai:3170000},"2026-11":{shinhan:3960000}});
 let redraw = load("v10.redraw", {});
 // 뱅크샐러드 생활비 10개 카테고리에 안 찍히는 것만 (이중 차감 방지).
 // KT 53,670 + 인터넷 17,600 + 어도비 46,860 + 라이나 치아보험 15,000
 // 더피플·클로드·젠스파크·쿠팡와우·마이박스·챗지피티는 가계부에 찍히므로 생활비로.
 let subs   = load("v10.subs3", 133130);
 let INCOME = load("v10.income", INCOME_DEFAULT);
-let csBal  = load("v10.csbal", 12220000);   // 현금서비스 3사 잔액
+let csBal  = load("v10.csbal2", 9120000);   // 현금서비스 3사 잔액
 let calCur = new Date(T.getFullYear(), T.getMonth(), 1);
 let pick   = null;
 
@@ -659,10 +663,9 @@ function dayItems(d, bt){
   const sh = billFor(key,"shinhan",bt), hn = billFor(key,"hana",bt), hy = billFor(key,"hyundai",bt);
   if(dd===13) out.push({n:"하나카드 결제", a:-hn, kind:"card"});
   if(dd===14) out.push({n:"하나 재인출", a:1500000, kind:"card"});
-  if(dd===15){
-    out.push({n:"신한 완납 (14일분, 정산금으로)", a:-sh, kind:"card"});
-    out.push({n:"신한 재인출", a:3100000, kind:"card"});
-  }
+  const draw = SHINHAN_DRAW[key] || {day:15, a:3100000};
+  if(dd===15) out.push({n:"신한 완납 (14일분, 정산금으로)", a:-sh, kind:"card"});
+  if(dd===draw.day && draw.a>0) out.push({n:"신한 재인출", a:draw.a, kind:"card"});
   if(dd===25){
     out.push({n:"현대 재인출", a:1600000, kind:"card"});
     out.push({n:"현대카드 결제", a:-hy, kind:"card"});
@@ -906,7 +909,7 @@ function renderDebt(){
        <div class="foot" style="padding-top:6px;">결제일마다 카드 앱에서 3사 합계를 확인해 고쳐주세요. 이 숫자가 줄어야 빚이 줄어요.</div>`;
   document.getElementById("csSave").onclick=()=>{
     const v=parseInt(document.getElementById("csIn").value,10);
-    if(isNaN(v)||v<0) return; csBal=v; save("v10.csbal",csBal); renderDebt();
+    if(isNaN(v)||v<0) return; csBal=v; save("v10.csbal2",csBal); renderDebt();
   };
   document.getElementById("debtSep").innerHTML =
     `따로 관리하는 두 건이에요. 버팀목 전세자금 3,200만 원(1.5%)은 만기 때 보증금으로 갚고,
@@ -971,7 +974,7 @@ document.getElementById("spendSet").onclick=()=>{
 document.getElementById("vatSw").onchange=e=>{ vatInst=e.target.checked; save("v10.vat",vatInst); renderMonth(); renderCal(); };
 document.getElementById("cashSave").onclick=()=>{
   const v=parseInt(document.getElementById("cashInput").value,10);
-  if(isNaN(v)) return; cash=v; save("v10.cash2",cash); renderEvents();
+  if(isNaN(v)) return; cash=v; save("v10.cash3",cash); renderEvents();
 };
 document.getElementById("calPrev").onclick=()=>{ calCur.setMonth(calCur.getMonth()-1); pick=null; renderCal(); };
 document.getElementById("calNext").onclick=()=>{ calCur.setMonth(calCur.getMonth()+1); pick=null; renderCal(); };
