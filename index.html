@@ -168,9 +168,13 @@
   .ev .bal{font-size:11.5px;color:var(--ink-3);font-weight:400;display:block;text-align:right;margin-top:3px;}
   .ev .bal.m{color:var(--neg);}
   .ev.past{opacity:.45;}
+  .ev.todo{cursor:pointer;-webkit-tap-highlight-color:transparent;}
+  .ev.todo:active{background:var(--accent-soft);}
   .ev.todo .el{font-weight:600;}
   .ev.todo .el:before{content:"☐ ";color:var(--accent);}
+  .ev.todo .el em{font-weight:400;}
   .ev.todo.done .el{color:var(--ink-3);text-decoration:line-through;}
+  .ev.todo.done .el em{text-decoration:none;}
   .ev.todo.done .el:before{content:"☑ ";color:var(--ink-3);text-decoration:none;}
   .nowline{display:flex;align-items:center;gap:10px;margin:16px 0 4px;}
   .nowline span{font-size:11.5px;font-weight:700;color:var(--accent);white-space:nowrap;}
@@ -300,11 +304,6 @@
     </div>
   </div>
 
-  <div class="sec">
-    <h2>이번 달 할 일</h2>
-    <p class="lead">날짜가 붙은 건 그날 반드시, 나머지는 이번 달 안에.</p>
-    <div id="taskList"></div>
-  </div>
 
   <div class="sec">
     <h2>계정</h2>
@@ -671,7 +670,8 @@ function dayItems(d, bt){
     out.push({n:"현대카드 결제", a:-hy, kind:"card"});
   }
   TAXES.forEach(t=>{ if(t.date===iso) out.push({n:t.n + (t.vat&&vatInst?" (무이자 할부 1회차)":""), a:-((t.vat&&vatInst)?Math.round(t.a/6):t.a), kind:"tax"}); });
-  return out;
+  // 같은 날이면 들어오는 돈을 먼저 — 잔액이 중간에 헛되이 마이너스로 보이지 않게
+  return out.sort((a,b)=> (b.a>0?1:0) - (a.a>0?1:0));
 }
 
 /* ============ 렌더: 이번 달 ============ */
@@ -755,17 +755,12 @@ function renderMonth(){
     const lc=document.getElementById("logClear"); if(lc) lc.onclick=()=>{ logs=[]; save("v10.logs",logs); renderMonth(); };
   }
 
-  // 할 일
-  document.getElementById("taskList").innerHTML = TASKS.map(t=>{
-    const done = !!tasksD[t.id];
-    return `<label class="task${done?" done":""}">
-      <input type="checkbox" data-t="${t.id}" ${done?"checked":""}/>
-      <div class="body"><div class="tt">${t.t}</div><div class="td">${t.d}</div></div>
-      <span class="when${t.date?"":" none"}">${fmtWhen(t)}</span></label>`;
-  }).join("");
-  document.querySelectorAll("[data-t]").forEach(cb=>cb.onchange=()=>{
-    tasksD[cb.dataset.t]=cb.checked; save("v10.tasks",tasksD); renderMonth(); renderCal();
-  });
+}
+/* 할 일 체크 — 일정 탭에서 */
+function toggleTask(id){
+  tasksD[id] = !tasksD[id];
+  save("v10.tasks", tasksD);
+  renderCal();            // 달력 점 + 일정 목록을 같이 다시 그려요
 }
 
 /* ============ 렌더: 일정 ============ */
@@ -804,7 +799,7 @@ function renderEvents(){
     from = new Date(T.getFullYear(), T.getMonth(), 1);          // 이번 달 1일부터
     to   = new Date(T.getFullYear(), T.getMonth()+2, 0);
     title.textContent = "이번 달과 다음 달";
-    lead.textContent = "지난 날짜는 흐리게 보여요. 잔액은 오늘 저장한 금액에서 이어 계산해요.";
+    lead.textContent = "지난 날짜는 흐리게 보여요. 할 일은 눌러서 체크해요. 잔액은 오늘 저장한 금액에서 이어 계산해요.";
   }
   const rows=[], bt = budget().total;
   eachDay(from,to,(d)=>{
@@ -825,9 +820,9 @@ function renderEvents(){
     if(!shownNow && !r.past){ shownNow = true; pre = `<div class="nowline"><span>오늘</span><i></i></div>`; }
     if(r.task){
       const done = !!tasksD[r.task.id];
-      return pre + `<div class="ev todo${done?" done":""}${r.past?" past":""}">
+      return pre + `<div class="ev todo${done?" done":""}${r.past?" past":""}" data-t="${r.task.id}">
         <span class="ed">${r.d.getMonth()+1}/${r.d.getDate()}</span>
-        <span class="el">${r.task.t}<em>할 일</em></span></div>`;
+        <span class="el">${r.task.t}<em>${r.task.d}</em></span></div>`;
     }
     return pre + `<div class="ev${r.past?" past":""}">
       <span class="ed">${r.d.getMonth()+1}/${r.d.getDate()}</span>
@@ -842,10 +837,11 @@ function renderEvents(){
   const extra = anytime.length ? `
     <div class="nowline" style="margin-top:22px;"><span>수시</span><i></i></div>`
     + anytime.map(t=>{ const done=!!tasksD[t.id];
-        return `<div class="ev todo${done?" done":""}">
+        return `<div class="ev todo${done?" done":""}" data-t="${t.id}">
           <span class="ed">—</span>
-          <span class="el">${t.t}<em>할 일</em></span></div>`; }).join("") : "";
+          <span class="el">${t.t}<em>${t.d}</em></span></div>`; }).join("") : "";
   list.innerHTML = html + extra;
+  list.querySelectorAll("[data-t]").forEach(el=>el.onclick=()=>toggleTask(el.dataset.t));
 }
 function renderCardFix(){
   const key = cycle().key;
