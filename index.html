@@ -168,6 +168,23 @@
   .ev .bal{font-size:11.5px;color:var(--ink-3);font-weight:400;display:block;text-align:right;margin-top:3px;}
   .ev .bal.m{color:var(--neg);}
   .ev.past{opacity:.45;}
+  .twin{display:flex;gap:14px;align-items:flex-start;}
+  .twin .half{flex:1;min-width:0;}
+  .twin .half.r{text-align:right;}
+  .twin .hl{display:block;font-size:12px;color:var(--ink-2);}
+  .twin .hv{display:block;font-size:25px;font-weight:700;letter-spacing:-.6px;margin-top:5px;line-height:1.1;}
+  .twin .hv.m{color:var(--neg);}
+  .twin .hs{display:block;font-size:11px;color:var(--ink-3);margin-top:5px;line-height:1.5;}
+
+  .ev.pay{cursor:pointer;-webkit-tap-highlight-color:transparent;}
+  .ev.pay:active{background:var(--accent-soft);}
+  .ev .ck{width:19px;height:19px;border-radius:6px;border:1.5px solid var(--line);
+    flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;
+    font-size:12px;color:transparent;line-height:1;}
+  .ev.ok .ck{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .ev.ok .el,.ev.ok .ea{color:var(--ink-3);}
+  .ev.ok .ea.p{color:var(--ink-3);}
+  .ev .ck.lock{border-style:dashed;opacity:.4;}
   .ev.todo{cursor:pointer;-webkit-tap-highlight-color:transparent;}
   .ev.todo:active{background:var(--accent-soft);}
   .ev.todo .el{font-weight:600;}
@@ -321,8 +338,19 @@
 <section class="screen" id="s-cal">
   <div class="sec" style="padding-top:28px;">
     <h2>통장 잔액</h2>
-    <p class="lead">날짜별로 실제 통장에서 빠지는 돈이에요. 예산과 달리 카드 결제액 전체가 들어가요.</p>
-    <div class="field">
+    <p class="lead">아래 일정에서 처리한 항목을 누르면 왼쪽 숫자가 바로 움직여요. 은행 앱과 어긋나면 직접 고쳐도 돼요.</p>
+    <div class="twin">
+      <div class="half">
+        <span class="hl">지금 통장</span>
+        <b class="hv num" id="cashNow">—</b>
+      </div>
+      <div class="half r">
+        <span class="hl" id="tillLbl">다음 월급 전까지</span>
+        <b class="hv num" id="cashEnd">—</b>
+        <span class="hs" id="tillSub"></span>
+      </div>
+    </div>
+    <div class="field" style="margin-top:14px;">
       <input type="number" id="cashInput" inputmode="numeric" />
       <button id="cashSave">잔액 저장</button>
     </div>
@@ -451,7 +479,7 @@ const mem={};
 function load(k,fb){ try{const v=localStorage.getItem(k); return v!==null?JSON.parse(v):(k in mem?mem[k]:fb);}catch(e){return (k in mem)?mem[k]:fb;} }
 function save(k,v){ mem[k]=v; try{localStorage.setItem(k,JSON.stringify(v));}catch(e){} push(); }
 const CLOUD_KEY = "state";
-function snapshotState(){ return {cash,cashV:3,billV:2,logs,vatInst,tasksD,cardFix,cardBill,redraw,subs,subsV:3,csV:2,INCOME,csBal,_at:Date.now()}; }
+function snapshotState(){ return {cash,cashV:3,billV:2,logs,vatInst,tasksD,doneP,cardFix,cardBill,redraw,subs,subsV:3,csV:2,INCOME,csBal,_at:Date.now()}; }
 function push(){
   if(!uid || pulling) return;
   clearTimeout(pushT);
@@ -467,6 +495,7 @@ function applyCloud(d){
   if(Array.isArray(d.logs)){ logs=d.logs; save("v10.logs",logs); }
   if(typeof d.vatInst==="boolean"){ vatInst=d.vatInst; save("v10.vat",vatInst); }
   if(d.tasksD){ tasksD=d.tasksD; save("v10.tasks",tasksD); }
+  if(d.doneP){ doneP=d.doneP; save("v10.donepay",doneP); }
   if(d.cardFix){ cardFix=d.cardFix; save("v10.cardfix",cardFix); }
   if(d.cardBill && d.billV===2){ cardBill=d.cardBill; save("v10.cardbill2",cardBill); }
   if(d.redraw){ redraw=d.redraw; save("v10.redraw",redraw); }
@@ -582,6 +611,7 @@ let cash   = load("v10.cash3", 0);
 let logs   = load("v10.logs", []);
 let vatInst= load("v10.vat", false);
 let tasksD = load("v10.tasks", {});
+let doneP  = load("v10.donepay", {});   // 처리한 돈 항목 {키: true}
 let cardFix= load("v10.cardfix", CARD_FIX_DEFAULT);
 let cardBill=load("v10.cardbill2", {"2026-10":{shinhan:3620000, hana:1900000, hyundai:3170000},"2026-11":{shinhan:3960000}});
 let redraw = load("v10.redraw", {});
@@ -799,20 +829,21 @@ function renderEvents(){
     from = new Date(T.getFullYear(), T.getMonth(), 1);          // 이번 달 1일부터
     to   = new Date(T.getFullYear(), T.getMonth()+2, 0);
     title.textContent = "이번 달과 다음 달";
-    lead.textContent = "지난 날짜는 흐리게 보여요. 할 일은 눌러서 체크해요. 잔액은 오늘 저장한 금액에서 이어 계산해요.";
+    lead.textContent = "오늘부터는 처리한 줄을 누르면 체크돼요. 지난 날짜는 이미 반영된 걸로 보고 흐리게만 보여요.";
   }
   const rows=[], bt = budget().total;
   eachDay(from,to,(d)=>{
     const iso = ISO(d), past = iso < T_ISO;
     // 그날 할 일을 먼저
     (TASK_BY_DATE[iso]||[]).forEach(t=> rows.push({d, past, task:t}));
-    // 그날 돈 내역
+    // 그날 돈 내역 — 처리한 건 잔액 계산에서 빼요 (이미 통장에 반영됐으니)
     dayItems(d,bt).forEach(it=>{
-      if(!pick && !past){ if(running===null) running = cash; running += it.a; }
-      rows.push({d, past, it, bal: (!pick && !past) ? running : null});
+      const key = payKey(iso, it), ok = !!doneP[key];
+      if(!pick && !past && !ok){ if(running===null) running = cash; running += it.a; }
+      rows.push({d, past, it, key, ok, bal: (!pick && !past && !ok) ? running : null});
     });
   });
-  if(!rows.length){ list.innerHTML = `<div class="empty">이 날짜에는 예정된 내역이 없어요.</div>`; return; }
+  if(!rows.length){ list.innerHTML = `<div class="empty">이 날짜에는 예정된 내역이 없어요.</div>`; renderCashHead(); return; }
   const kn={in:"입금",loan:"대출",card:"카드",tax:"세금",fix:"고정비"};
   let shownNow = pick ? true : false;
   const html = rows.map(r=>{
@@ -824,9 +855,12 @@ function renderEvents(){
         <span class="ed">${r.d.getMonth()+1}/${r.d.getDate()}</span>
         <span class="el">${r.task.t}<em>${r.task.d}</em></span></div>`;
     }
-    return pre + `<div class="ev${r.past?" past":""}">
+    const tap = !r.past;   // 지난 날짜는 이미 반영된 것으로 보고 체크를 안 받아요
+    return pre + `<div class="ev${r.past?" past":""}${r.ok?" ok":""}${tap?" pay":""}"
+        ${tap?`data-p="${r.key}" data-a="${r.it.a}"`:""}>
+      <span class="ck${tap?"":" lock"}">✓</span>
       <span class="ed">${r.d.getMonth()+1}/${r.d.getDate()}</span>
-      <span class="el">${r.it.n}<em>${kn[r.it.kind]}</em></span>
+      <span class="el">${r.it.n}<em>${r.ok?"처리함":kn[r.it.kind]}</em></span>
       <span><span class="ea ${r.it.a>0?"p":""}">${r.it.a>0?"+":""}${W(r.it.a)}</span>
       ${r.bal!==null?`<span class="bal${r.bal<0?" m":""}">${W(r.bal)}</span>`:""}</span>
     </div>`;
@@ -842,6 +876,45 @@ function renderEvents(){
           <span class="el">${t.t}<em>${t.d}</em></span></div>`; }).join("") : "";
   list.innerHTML = html + extra;
   list.querySelectorAll("[data-t]").forEach(el=>el.onclick=()=>toggleTask(el.dataset.t));
+  list.querySelectorAll("[data-p]").forEach(el=>el.onclick=()=>togglePay(el.dataset.p, +el.dataset.a));
+  renderCashHead();
+}
+
+/* 돈 항목 체크 — 누르면 통장 잔액이 그만큼 움직여요 */
+function payKey(iso, it){ return iso + "|" + it.n; }
+function togglePay(key, amount){
+  if(doneP[key]){ delete doneP[key]; cash -= amount; }   // 되돌리기
+  else          { doneP[key] = true; cash += amount; }   // 방금 처리함
+  save("v10.donepay", doneP);
+  save("v10.cash3", cash);
+  const ci=document.getElementById("cashInput"); if(ci) ci.value=cash;
+  renderCal();
+}
+
+/* 맨 위 두 숫자 */
+function renderCashHead(){
+  const now = document.getElementById("cashNow");
+  const end = document.getElementById("cashEnd");
+  if(!now || !end) return;
+  now.textContent = W(cash);
+  now.className = "hv num" + (cash<0?" m":"");
+
+  // 다음 월급(10일)까지 남은 미처리 항목만 더해요
+  const nextPay = new Date(T.getFullYear(), T.getMonth() + (T.getDate() >= 10 ? 1 : 0), 10);
+  let bal = cash, left = 0, bt = budget().total;
+  eachDay(T, new Date(nextPay.getTime() - 86400000), (d)=>{
+    const iso = ISO(d);
+    dayItems(d, bt).forEach(it=>{
+      if(doneP[payKey(iso,it)]) return;
+      bal += it.a; left++;
+    });
+  });
+  end.textContent = W(bal);
+  end.className = "hv num" + (bal<0?" m":"");
+  document.getElementById("tillLbl").textContent =
+    `${nextPay.getMonth()+1}월 ${nextPay.getDate()}일 월급 전까지`;
+  document.getElementById("tillSub").textContent =
+    left ? `남은 일정 ${left}건을 다 치르면` : "남은 일정 없음";
 }
 function renderCardFix(){
   const key = cycle().key;
